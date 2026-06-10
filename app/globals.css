@@ -97,6 +97,7 @@ body > *{ position:relative; z-index:1; }
     order:1;
     width:336px;
     max-width:100%;
+    contain:paint;
   }
   .panel{
     order:2;
@@ -486,10 +487,10 @@ body > *{ position:relative; z-index:1; }
 
 .buyBtn{
   position:relative;
-  display:inline-flex;
+  display:flex;
   align-items:center;
   justify-content:center;
-  width:auto;
+  width:100%;
   min-height:var(--panel-field-h);
   padding:0 20px;
   border-radius:9px;

@@ -1,16 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { STYLES, TEAMS } from "@/lib/card";
-import { CHARITY } from "@/lib/charity";
+import { TEAMS } from "@/lib/card";
 import {
   buildCardShareUrl,
   buildShareCopy,
   type CardShareState,
   type SharePlatform,
 } from "@/lib/cardShareUrl";
-import { PRICE_LABEL } from "@/lib/pricing";
-import { clearPendingCheckout, savePendingCheckout } from "@/lib/pendingCheckout";
 import { waitForCardReady } from "@/lib/waitForCardReady";
 import { recordCardVideo, RecordAbortedError } from "@/lib/recordCardVideo";
 import { resetCardPointerState } from "@/lib/cardPointerState";
@@ -19,11 +16,6 @@ import CheckoutModal from "@/components/CheckoutModal";
 type BuyCardPanelProps = CardShareState & {
   captureRef: React.RefObject<HTMLElement | null>;
   disabled?: boolean;
-  photoUrl?: string | null;
-  photoCutout?: boolean;
-  checkoutSessionId?: string | null;
-  checkoutCancelled?: boolean;
-  onCheckoutHandled?: () => void;
 };
 
 const PLATFORMS: SharePlatform[] = [
@@ -62,31 +54,23 @@ export default function BuyCardPanel({
   cardStyle,
   shine,
   finish,
-  photoUrl = null,
-  photoCutout = false,
-  checkoutSessionId,
-  checkoutCancelled = false,
-  onCheckoutHandled,
 }: BuyCardPanelProps) {
   const [open, setOpen] = useState(false);
-  const [purchased, setPurchased] = useState(false);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [checkoutPhase, setCheckoutPhase] = useState<"idle" | "redirect" | "render">("idle");
+  const [ready, setReady] = useState(false);
+  const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   const [copied, setCopied] = useState(false);
-  const [buyHover, setBuyHover] = useState(false);
+  const [btnHover, setBtnHover] = useState(false);
 
   const videoUrlRef = useRef<string | null>(null);
   const renderGenRef = useRef(0);
   const renderPromiseRef = useRef<Promise<Blob> | null>(null);
-  const fulfilledSessionRef = useRef<string | null>(null);
 
   const shareState = { name, team, cardStyle, shine, finish };
   const shareUrl = buildCardShareUrl(shareState);
   const shareText = buildShareCopy(shareState);
-  const styleName = STYLES.find((s) => s.id === cardStyle)?.name ?? "Prizm";
   const displayName = name.trim() || "Player";
   const slug = displayName
     .toLowerCase()
@@ -200,107 +184,42 @@ export default function BuyCardPanel({
     a.click();
   }, [slug]);
 
-  const fulfillPaidOrder = useCallback(
-    async (sessionId: string) => {
-      if (fulfilledSessionRef.current === sessionId) return;
-      fulfilledSessionRef.current = sessionId;
+  const generateAndDownload = useCallback(async () => {
+    if (rendering) return;
+    setRendering(true);
+    setReady(false);
+    setError(null);
 
-      setOpen(true);
-      setCheckingOut(true);
-      setCheckoutPhase("render");
-      setError(null);
-      setPurchased(false);
+    try {
+      const stage = captureRef.current;
+      if (!stage) throw new Error("Could not find your card to render.");
+      await waitForCardReady(stage);
+      await ensureVideo();
+      downloadVideo();
+      setReady(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create your video.");
+    } finally {
+      setRendering(false);
+    }
+  }, [captureRef, downloadVideo, ensureVideo, rendering]);
 
-      try {
-        const res = await fetch(`/api/checkout/verify?session_id=${encodeURIComponent(sessionId)}`);
-        const data = (await res.json()) as { paid?: boolean; error?: string };
-        if (!res.ok || !data.paid) {
-          throw new Error(data.error || "Payment could not be verified. Please contact support.");
-        }
-
-        const stage = captureRef.current;
-        if (!stage) throw new Error("Could not find your card to render.");
-        await waitForCardReady(stage);
-
-        await ensureVideo();
-        downloadVideo();
-        setPurchased(true);
-        clearPendingCheckout();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not complete your order.");
-      } finally {
-        setCheckingOut(false);
-        setCheckoutPhase("idle");
-        onCheckoutHandled?.();
-      }
-    },
-    [captureRef, downloadVideo, ensureVideo, onCheckoutHandled]
-  );
-
-  useEffect(() => {
-    if (!checkoutSessionId) return;
-    void fulfillPaidOrder(checkoutSessionId);
-  }, [checkoutSessionId, fulfillPaidOrder]);
-
-  useEffect(() => {
-    if (!checkoutCancelled) return;
+  const handleDownloadClick = () => {
     setOpen(true);
-    setError("Checkout cancelled. Your card is still here when you're ready.");
-    onCheckoutHandled?.();
-  }, [checkoutCancelled, onCheckoutHandled]);
+    void generateAndDownload();
+  };
 
   const close = () => {
-    if (checkingOut) return;
+    if (rendering) return;
     renderGenRef.current += 1;
     renderPromiseRef.current = null;
     restoreStage();
     setOpen(false);
-    setCheckingOut(false);
-    setCheckoutPhase("idle");
-    setPurchased(false);
+    setRendering(false);
+    setReady(false);
     setError(null);
     setCopied(false);
     cleanupVideo();
-  };
-
-  const purchase = async () => {
-    if (checkingOut) return;
-    setCheckingOut(true);
-    setCheckoutPhase("redirect");
-    setError(null);
-
-    try {
-      await savePendingCheckout({
-        name: displayName,
-        team,
-        cardStyle,
-        shine,
-        finish,
-        photoUrl,
-        photoCutout,
-      });
-
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: displayName,
-          team,
-          cardStyle,
-          shine,
-          finish,
-        }),
-      });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        throw new Error(data.error || "Could not start secure checkout.");
-      }
-      window.location.href = data.url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start secure checkout.");
-      setCheckingOut(false);
-      setCheckoutPhase("idle");
-    }
   };
 
   const copyLink = async () => {
@@ -347,38 +266,31 @@ export default function BuyCardPanel({
   return (
     <>
       <div
-        className={`buyBtnWrap${buyHover ? " buyBtnWrap-hover" : ""}${disabled ? " buyBtnWrap-disabled" : ""}`}
+        className={`buyBtnWrap${btnHover ? " buyBtnWrap-hover" : ""}${disabled ? " buyBtnWrap-disabled" : ""}`}
         style={kitStyle}
-        onMouseEnter={() => setBuyHover(true)}
-        onMouseLeave={() => setBuyHover(false)}
+        onMouseEnter={() => setBtnHover(true)}
+        onMouseLeave={() => setBtnHover(false)}
       >
         <button
           type="button"
           className="buyBtn"
           disabled={disabled}
-          aria-label={`Buy card for ${PRICE_LABEL}`}
-          onClick={() => setOpen(true)}
+          aria-label="Download holo card video"
+          onClick={handleDownloadClick}
         >
-          Buy card {PRICE_LABEL}
+          Download
         </button>
-        <p className="buyBtnCharity">{CHARITY.tagline}</p>
       </div>
 
       <CheckoutModal
         open={open}
         onClose={close}
-        checkingOut={checkingOut}
-        checkoutPhase={checkoutPhase}
+        rendering={rendering}
         error={error}
-        purchased={purchased}
+        ready={ready}
         videoUrl={videoUrl}
-        displayName={displayName}
-        team={team}
-        styleName={styleName}
-        finish={finish}
-        captureRef={captureRef}
-        onPurchase={() => void purchase()}
         onDownload={downloadVideo}
+        onRetry={() => void generateAndDownload()}
         onCopyLink={() => void copyLink()}
         copied={copied}
         shareUrl={shareUrl}

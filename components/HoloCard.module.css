@@ -51,7 +51,7 @@
 .processing{
   position:absolute; inset:0; z-index:20;
   display:flex; align-items:center; justify-content:center;
-  border-radius:18px; background:rgba(4,6,10,.72); backdrop-filter:blur(6px);
+  border-radius:inherit; background:rgba(4,6,10,.72); backdrop-filter:blur(6px);
   pointer-events:none;
 }
 .processingInner{
@@ -87,6 +87,7 @@
   --t1:#e8c84d; --t2:#b8a06a; --accent:#e8c84d;
   --facet:none; --emboss:none;
   --fs:40px;
+  --card-radius:18px;
   /* foil shine gradients (overridden per shine; default = rainbow) */
   --holoGrad:repeating-linear-gradient(115deg,
     hsl(0 95% 66%) 0%, hsl(48 95% 64%) 6%, hsl(120 80% 56%) 12%,
@@ -95,12 +96,16 @@
     hsl(0 95% 66%) 0deg, hsl(50 95% 64%) 1.4deg, hsl(150 85% 56%) 2.8deg,
     hsl(200 95% 66%) 4.2deg, hsl(300 90% 64%) 5.6deg, hsl(0 95% 66%) 7deg);
 
-  position:relative; width:336px; height:470px; border-radius:18px;
+  position:relative; width:336px; height:470px; border-radius:var(--card-radius);
   transform:rotateX(var(--rx)) rotateY(var(--ry)) scale(var(--scale));
   transform-style:preserve-3d; will-change:transform;
   /* slow glide back to rest; [data-active] tightens it for pointer tracking */
   transition:transform .7s cubic-bezier(.23,1,.32,1);
   cursor:grab; overflow:hidden; isolation:isolate;
+  -webkit-clip-path:inset(0 round var(--card-radius));
+          clip-path:inset(0 round var(--card-radius));
+  -webkit-backface-visibility:hidden;
+          backface-visibility:hidden;
   background:#070809;
   animation:cardFloat 9s ease-in-out infinite, hueShimmer 7.5s ease-in-out infinite, glowPulse 5.5s ease-in-out infinite;
   box-shadow:
@@ -123,6 +128,8 @@
 .artScene{
   position:absolute; inset:0; overflow:hidden;
   border-radius:inherit; isolation:isolate;
+  -webkit-clip-path:inset(0 round var(--card-radius));
+          clip-path:inset(0 round var(--card-radius));
 }
 
 .fullArt{ z-index:0; }
@@ -378,6 +385,17 @@
   transition:transform .18s cubic-bezier(.2,.7,.3,1);
 }
 
+@media (max-width:720px){
+  .top,
+  .bottom{
+    transform:none;
+  }
+  .content{
+    -webkit-clip-path:inset(0 round var(--card-radius));
+            clip-path:inset(0 round var(--card-radius));
+  }
+}
+
 @media (prefers-reduced-motion: reduce){
   .card, .holo, .sweep, .fullArt{ animation:none !important; }
   .processingBar{ transition:none; }
@@ -385,7 +403,7 @@
 
 .frame{
   z-index:9;
-  inset:0; border-radius:18px; border:4px solid transparent;
+  inset:0; border-radius:inherit; border:4px solid transparent;
   background:
     linear-gradient(140deg, var(--t1) 0%, var(--t2) 48%, var(--t1) 100%) border-box;
   -webkit-mask:linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
@@ -394,7 +412,7 @@
 }
 .frameInner{
   z-index:9;
-  inset:7px; border-radius:12px;
+  inset:7px; border-radius:calc(var(--card-radius) - 6px);
   border:1px solid color-mix(in srgb, var(--accent) 42%, rgba(255,255,255,.12));
   box-shadow:
     inset 0 0 0 1px rgba(0,0,0,.5),

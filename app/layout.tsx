@@ -31,13 +31,12 @@ const sairaCondensed = Saira_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "Holo Card Studio — World Cup 2026",
+  title: "Holo Card Studio",
   description:
-    "Design your holographic World Cup 2026 trading card, download a 10s holo video for $2, and support youth soccer through San Francisco Youth Soccer.",
+    "Design your holographic World Cup 2026 trading card and download a free 10s holo video.",
   openGraph: {
-    title: "Holo Card Studio — World Cup 2026",
-    description:
-      "Create a personalized holo card, download your video, and support youth soccer.",
+    title: "Holo Card Studio",
+    description: "Create a personalized holo card and download your video.",
   },
 };
 

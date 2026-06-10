@@ -1,3 +1,4 @@
+/** San Francisco Youth Soccer — stored for future paid / donation launch. */
 export const CHARITY = {
   name: "San Francisco Youth Soccer",
   shortName: "SFYS",

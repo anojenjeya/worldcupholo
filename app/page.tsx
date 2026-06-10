@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import HoloCard from "@/components/HoloCard";
 import BuyCardPanel from "@/components/BuyCardPanel";
 import TeamBackground from "@/components/TeamBackground";
@@ -16,7 +16,6 @@ import {
 } from "@/lib/card";
 import { removePhotoBackground } from "@/lib/removeBackground";
 import { CARD_BUILD_MESSAGES } from "@/lib/cardBuildMessages";
-import { loadPendingCheckout } from "@/lib/pendingCheckout";
 
 import FlagImg from "@/components/FlagImg";
 
@@ -41,18 +40,10 @@ export default function Home() {
   const countrySearchRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
-  const [checkoutCancelled, setCheckoutCancelled] = useState(false);
-
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
-  }, []);
-
-  const clearCheckoutParams = useCallback(() => {
-    setCheckoutSessionId(null);
-    setCheckoutCancelled(false);
   }, []);
 
   const applyCutout = (blob: Blob) => {
@@ -115,34 +106,15 @@ export default function Home() {
     const p = new URLSearchParams(window.location.search);
     const get = (k: string) => p.get(k) || undefined;
 
-    const sessionId = p.get("session_id");
-    const pending = sessionId ? loadPendingCheckout() : null;
+    if (get("name")) setName(get("name")!);
+    if (get("team")) setTeam(get("team")!);
+    if (get("style")) setCardStyle(get("style") as CardStyle);
+    if (get("shine")) setShine(get("shine") as Shine);
+    if (get("finish")) setFinish(get("finish") as Finish);
+    const photo = get("photo");
+    if (photo) void processPhoto(photo);
 
-    if (pending) {
-      if (pending.name) setName(pending.name);
-      if (pending.team) setTeam(pending.team);
-      if (pending.cardStyle) setCardStyle(pending.cardStyle);
-      if (pending.shine) setShine(pending.shine);
-      if (pending.finish) setFinish(pending.finish);
-      if (pending.photoDataUrl) {
-        setPhotoUrl(pending.photoDataUrl);
-        setPhotoCutout(pending.photoCutout);
-      }
-    } else {
-      if (get("name")) setName(get("name")!);
-      if (get("team")) setTeam(get("team")!);
-      if (get("style")) setCardStyle(get("style") as CardStyle);
-      if (get("shine")) setShine(get("shine") as Shine);
-      if (get("finish")) setFinish(get("finish") as Finish);
-      const photo = get("photo");
-      if (photo) void processPhoto(photo);
-    }
-
-    if (sessionId) {
-      window.history.replaceState({}, "", window.location.pathname);
-      window.setTimeout(() => setCheckoutSessionId(sessionId), 120);
-    } else if (p.get("checkout") === "cancelled") {
-      setCheckoutCancelled(true);
+    if (p.toString()) {
       window.history.replaceState({}, "", window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,11 +203,6 @@ export default function Home() {
               cardStyle={cardStyle}
               shine={shine}
               finish={finish}
-              photoUrl={photoUrl}
-              photoCutout={photoCutout}
-              checkoutSessionId={checkoutSessionId}
-              checkoutCancelled={checkoutCancelled}
-              onCheckoutHandled={clearCheckoutParams}
             />
           </div>
         </div>
