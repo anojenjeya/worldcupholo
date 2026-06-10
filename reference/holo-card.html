@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holo Card — Obsidian</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --obsidian:#0a0b0e;
+    --carbon:#15171d;
+    --champagne:#d8c290;
+    --champagne-2:#b8a06a;
+    --platinum:#d7dbe4;
+    --txt:#eef1f6;
+    --muted:#7c8092;
+    --line:rgba(255,255,255,.07);
+    --accent:#e8c84d; /* team hairline only — overridden by JS */
+    --sans:'Geist', ui-sans-serif, -apple-system, system-ui, sans-serif;
+    --mono:'Geist Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1000px 700px at 75% -15%, rgba(216,194,144,.05), transparent 55%),
+      radial-gradient(800px 600px at -5% 115%, rgba(120,140,200,.04), transparent 55%),
+      #060709;
+    color:var(--txt); font-family:var(--sans); min-height:100vh;
+    display:flex; gap:64px; align-items:center; justify-content:center; flex-wrap:wrap; padding:56px 24px;
+  }
+
+  /* ======== CARD ======== */
+  .stage{perspective:1600px}
+  .card{
+    --rx:0deg; --ry:0deg; --mx:50%; --my:38%; --gloss:0;
+    position:relative; width:336px; height:470px; border-radius:18px;
+    transform:rotateX(var(--rx)) rotateY(var(--ry)); transform-style:preserve-3d;
+    transition:transform .14s cubic-bezier(.2,.7,.3,1);
+    cursor:grab;
+    background:
+      linear-gradient(155deg, #1a1d24 0%, #0c0d11 46%, #07080b 100%);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.05) inset,
+      0 0 0 1px rgba(255,255,255,.04) inset,
+      0 50px 90px -34px rgba(0,0,0,.9),
+      0 0 36px -12px rgba(216,194,144,.12);
+    overflow:hidden; isolation:isolate;
+  }
+  .layer{position:absolute; inset:0; pointer-events:none}
+
+  /* photo: cool desaturated duotone so any selfie reads premium */
+  .photo{
+    background-size:cover; background-position:center 18%;
+    filter:grayscale(.45) contrast(1.06) brightness(.92);
+    -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 46%,transparent 86%);
+            mask-image:linear-gradient(180deg,#000 0%,#000 46%,transparent 86%);
+  }
+  .photo.empty{background:linear-gradient(160deg,#1c1f27,#0d0f14)}
+  .photo.empty::after{
+    content:"PORTRAIT"; position:absolute; top:24%; left:0; right:0; text-align:center;
+    font-family:var(--mono); font-size:10px; letter-spacing:.5em; color:rgba(255,255,255,.16);
+  }
+  .duotone{ background:linear-gradient(180deg, transparent 22%, rgba(8,9,12,.4) 58%, var(--obsidian) 88%); }
+  .vignette{ box-shadow:inset 0 0 90px 30px rgba(0,0,0,.55); }
+
+  /* engine-turned guilloché — always faint, dial-like */
+  .engine{
+    opacity:.06; mix-blend-mode:soft-light;
+    background:
+      repeating-linear-gradient(63deg, #fff 0 .5px, transparent .5px 4px),
+      repeating-linear-gradient(-63deg, #fff 0 .5px, transparent .5px 4px),
+      repeating-radial-gradient(circle at 50% 30%, #fff 0 .5px, transparent .5px 6px);
+  }
+
+  /* brushed-metal foil — masked to a moving specular sweep, soft-light, mostly hidden */
+  .sheen{
+    mix-blend-mode:soft-light;
+    opacity:calc(.28 + var(--gloss)*.62);
+    background:repeating-linear-gradient(
+      105deg,
+      rgba(216,194,144,0) 0px,
+      rgba(216,194,144,.55) 2px,
+      rgba(215,219,228,.5) 4px,
+      rgba(150,170,195,.28) 6.5px,
+      rgba(216,194,144,0) 10px);
+    background-size:200% 200%;
+    background-position:calc(var(--mx)*1.4) calc(var(--my)*1.4);
+    -webkit-mask-image:radial-gradient(140px 180px at var(--mx) var(--my), #000 0%, rgba(0,0,0,.35) 45%, transparent 72%);
+            mask-image:radial-gradient(140px 180px at var(--mx) var(--my), #000 0%, rgba(0,0,0,.35) 45%, transparent 72%);
+  }
+  /* whisper of spectrum — only ignites at the glare angle */
+  .spectrum{
+    mix-blend-mode:screen; opacity:calc(var(--gloss)*.22);
+    background:linear-gradient(105deg,
+      hsla(180,40%,60%,.4), hsla(45,45%,62%,.4), hsla(300,35%,60%,.4), hsla(180,40%,60%,.4));
+    background-size:200% 200%;
+    background-position:calc(var(--mx)*1.6) calc(var(--my)*1.6);
+    -webkit-mask-image:radial-gradient(120px 150px at var(--mx) var(--my), #000, transparent 60%);
+            mask-image:radial-gradient(120px 150px at var(--mx) var(--my), #000, transparent 60%);
+  }
+  /* tight specular */
+  .glare{
+    mix-blend-mode:soft-light; opacity:calc(.15 + var(--gloss)*.55);
+    background:radial-gradient(80px 100px at var(--mx) var(--my), rgba(255,255,255,.6), transparent 65%);
+  }
+  /* fine grain for matte material depth */
+  .grain{
+    opacity:.05; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* engraved double-hairline frame */
+  .frame-border{
+    inset:10px; border-radius:11px;
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 0 0 1px rgba(0,0,0,.5), inset 0 0 0 4px rgba(255,255,255,.015);
+  }
+  .accent-tick{ /* the ONLY team color, a single hairline */
+    position:absolute; top:22px; left:22px; width:34px; height:2px; border-radius:2px;
+    background:var(--accent); box-shadow:0 0 10px -1px var(--accent);
+  }
+
+  /* ======== CONTENT ======== */
+  .content{position:absolute; inset:0; padding:24px; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none}
+  .top{display:flex; justify-content:space-between; align-items:flex-start; transform:translateZ(26px)}
+  .ovr{display:flex; flex-direction:column; gap:1px}
+  .ovr b{font-family:var(--sans); font-weight:600; font-size:34px; line-height:.9; letter-spacing:-.02em;
+    background:linear-gradient(160deg,#fff,var(--platinum) 40%,var(--champagne) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .ovr small, .rarity{font-family:var(--mono); font-size:9px; letter-spacing:.42em; color:var(--muted); text-transform:uppercase}
+  .rarity{margin-left:38px; align-self:center; color:var(--champagne)}
+  .num{font-family:var(--sans); font-weight:300; font-size:46px; line-height:.8; color:rgba(255,255,255,.14); letter-spacing:-.03em}
+
+  .bottom{transform:translateZ(40px)}
+  .name{
+    font-family:var(--sans); font-weight:600; font-size:38px; line-height:.96; letter-spacing:-.025em;
+    background:linear-gradient(165deg,#ffffff 0%,#e7ebf2 38%,var(--champagne) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 1px 0 rgba(0,0,0,.5)); text-transform:uppercase;
+  }
+  .sub{display:flex; gap:14px; align-items:center; margin-top:9px; font-family:var(--mono); font-size:10px; letter-spacing:.28em; text-transform:uppercase; color:var(--muted)}
+  .sub .pos{color:var(--champagne)}
+  .hr{height:1px; margin:15px 0 13px; background:linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent)}
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:13px 8px}
+  .stat{display:flex; flex-direction:column; gap:3px}
+  .stat b{font-family:var(--sans); font-weight:500; font-size:19px; letter-spacing:-.01em; color:var(--txt)}
+  .stat small{font-family:var(--mono); font-size:8px; letter-spacing:.32em; color:var(--muted)}
+
+  /* ======== PANEL ======== */
+  .panel{width:320px; max-width:100%}
+  .panel .kicker{font-family:var(--mono); font-size:10px; letter-spacing:.4em; color:var(--champagne); text-transform:uppercase}
+  .panel h1{font-weight:600; font-size:27px; letter-spacing:-.03em; margin:8px 0 6px}
+  .panel p.lead{color:var(--muted); font-size:13px; line-height:1.6; margin-bottom:22px}
+  label{display:block; font-family:var(--mono); font-size:9px; letter-spacing:.28em; text-transform:uppercase; color:var(--muted); margin:18px 0 8px}
+  input[type=text], select{width:100%; background:var(--carbon); border:1px solid var(--line); color:var(--txt);
+    padding:11px 13px; border-radius:9px; font-family:var(--sans); font-size:14px; outline:none; transition:border-color .2s}
+  input:focus, select:focus{border-color:var(--champagne-2)}
+  .row{display:flex; gap:10px}
+  .file{display:flex; align-items:center; gap:12px; padding:13px; border:1px dashed var(--line); border-radius:9px; cursor:pointer; transition:border-color .2s}
+  .file:hover{border-color:var(--champagne-2)}
+  .file span{font-size:12px; color:var(--muted); font-family:var(--mono); letter-spacing:.06em}
+  input[type=file]{display:none}
+  .aliasbtn{margin-top:9px; width:100%; padding:12px; border:1px solid var(--champagne-2); border-radius:9px; cursor:pointer;
+    background:linear-gradient(180deg, rgba(216,194,144,.14), rgba(216,194,144,.04)); color:var(--champagne);
+    font-family:var(--mono); font-weight:500; letter-spacing:.16em; font-size:10px; text-transform:uppercase; transition:.2s}
+  .aliasbtn:hover{background:linear-gradient(180deg, rgba(216,194,144,.22), rgba(216,194,144,.08))}
+  .note{margin-top:22px; font-size:12px; color:var(--muted); line-height:1.6; border-top:1px solid var(--line); padding-top:15px}
+  .note code{font-family:var(--mono); font-size:11px; color:var(--platinum)}
+</style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="card" id="card">
+      <div class="layer photo empty" id="photo"></div>
+      <div class="layer duotone"></div>
+      <div class="layer engine"></div>
+      <div class="layer vignette"></div>
+      <div class="layer sheen"></div>
+      <div class="layer spectrum"></div>
+      <div class="layer glare"></div>
+      <div class="layer grain"></div>
+      <div class="layer frame-border"></div>
+      <div class="accent-tick"></div>
+      <div class="content">
+        <div class="top">
+          <div class="ovr"><b id="ovr">88</b><small>Overall</small></div>
+          <div class="rarity" id="rarity">Holo</div>
+          <div class="num" id="num">10</div>
+        </div>
+        <div class="bottom">
+          <div class="name" id="name">Anojinho</div>
+          <div class="sub"><span class="pos" id="pos">CAM</span><span id="team">Brazil</span></div>
+          <div class="hr"></div>
+          <div class="stats" id="stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="kicker">Reference Build</div>
+    <h1>Compose the card</h1>
+    <p class="lead">Tilt it. The foil stays hidden until light hits the glare angle, then sweeps as brushed metal — restraint is the point.</p>
+
+    <label>Portrait</label>
+    <label class="file" for="file"><span id="filelabel">Upload — tap or drop</span><input type="file" id="file" accept="image/*"></label>
+
+    <label>Name</label>
+    <input type="text" id="inName" value="Anojen" placeholder="Your name">
+    <button class="aliasbtn" id="alias">Generate football alias</button>
+
+    <label>Team</label>
+    <select id="inTeam"></select>
+
+    <div class="row">
+      <div style="flex:1"><label>Number</label><input type="text" id="inNum" value="10" maxlength="2"></div>
+      <div style="flex:1"><label>Position</label><select id="inPos"></select></div>
+    </div>
+
+    <p class="note"><b>What carries the “elite” feel:</b> <code>.sheen</code> masked to a moving radial (light on metal, not a rainbow flag), <code>soft-light</code> blends at low opacity, the <code>.engine</code> guilloché, grain, and team color reduced to one <code>.accent-tick</code> hairline.</p>
+  </div>
+
+<script>
+const TEAMS = {
+  Brazil:{accent:'#e8c84d', alias:braz},
+  Argentina:{accent:'#8fd0f0', alias:n=>n},
+  Spain:{accent:'#d4af37', alias:n=>'El '+first(n)},
+  Italy:{accent:'#5e8bff', alias:n=>first(n)+'i'},
+  Netherlands:{accent:'#ff7a1a', alias:n=>'van '+cap(last(n))},
+  Iceland:{accent:'#9fb4c8', alias:n=>cap(first(n))+'sson'},
+  USA:{accent:'#c9d2e6', alias:n=>n},
+  Canada:{accent:'#ff4d4d', alias:n=>n},
+  Portugal:{accent:'#1faf6a', alias:n=>first(n)},
+  France:{accent:'#6a8bff', alias:n=>'Le '+first(n)},
+};
+const POSITIONS={
+  ST:{pac:1,sho:1.15,pas:.85,dri:1,def:.5,phy:1},
+  CAM:{pac:.95,sho:.95,pas:1.15,dri:1.15,def:.6,phy:.85},
+  CM:{pac:.9,sho:.85,pas:1.15,dri:1,def:.95,phy:1},
+  CB:{pac:.85,sho:.5,pas:.8,dri:.75,def:1.2,phy:1.2},
+  GK:{pac:.7,sho:.4,pas:.8,dri:.6,def:1.1,phy:1},
+};
+const first=n=>n.trim().split(' ')[0];
+const last=n=>n.trim().split(' ').pop();
+const cap=s=>s?s[0].toUpperCase()+s.slice(1).toLowerCase():s;
+function braz(n){let f=first(n).toLowerCase().replace(/[aeiou]+$/,'');return cap(f)+'inho';}
+
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function rand(seed){let x=seed;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
+function buildStats(name,pos){
+  const r=rand(hash(name+pos)), w=POSITIONS[pos], base=()=>68+Math.floor(r()*28), c=v=>Math.max(58,Math.min(99,Math.round(v)));
+  const s={PAC:c(base()*w.pac),SHO:c(base()*w.sho),PAS:c(base()*w.pas),DRI:c(base()*w.dri),DEF:c(base()*w.def),PHY:c(base()*w.phy)};
+  return {s, ovr:c((s.PAC+s.SHO+s.PAS+s.DRI+s.DEF+s.PHY)/6+4)};
+}
+function rarity(ovr,name){
+  if(hash(name)%17===0) return 'Prismatic';
+  if(ovr>=90) return 'Icon';
+  if(ovr>=85) return 'Gold';
+  return 'Holo';
+}
+
+const el=id=>document.getElementById(id);
+Object.keys(TEAMS).forEach(t=>el('inTeam').add(new Option(t,t)));
+Object.keys(POSITIONS).forEach(p=>el('inPos').add(new Option(p,p)));
+el('inPos').value='CAM';
+
+function render(){
+  const raw=el('inName').value||'Player', team=el('inTeam').value, pos=el('inPos').value, num=el('inNum').value||'0';
+  const {s,ovr}=buildStats(raw,pos);
+  document.documentElement.style.setProperty('--accent',TEAMS[team].accent);
+  el('name').textContent=el('inName').dataset.alias||raw;
+  el('team').textContent=team; el('pos').textContent=pos; el('num').textContent=num;
+  el('ovr').textContent=ovr; el('rarity').textContent=rarity(ovr,raw);
+  el('stats').innerHTML=Object.entries(s).map(([k,v])=>`<div class="stat"><b>${v}</b><small>${k}</small></div>`).join('');
+}
+el('alias').onclick=()=>{el('inName').dataset.alias=TEAMS[el('inTeam').value].alias(el('inName').value||'Player');render();};
+['inName','inTeam','inNum','inPos'].forEach(id=>el(id).addEventListener('input',()=>{if(id==='inName')delete el('inName').dataset.alias;render();}));
+el('file').onchange=e=>{const f=e.target.files[0];if(!f)return;el('filelabel').textContent=f.name;const p=el('photo');p.classList.remove('empty');p.style.backgroundImage=`url(${URL.createObjectURL(f)})`;};
+
+const card=el('card');
+function move(px,py){const r=card.getBoundingClientRect(),x=(px-r.left)/r.width,y=(py-r.top)/r.height;
+  card.style.setProperty('--ry',(x-.5)*18+'deg');card.style.setProperty('--rx',(.5-y)*18+'deg');
+  card.style.setProperty('--mx',x*100+'%');card.style.setProperty('--my',y*100+'%');
+  card.style.setProperty('--gloss',Math.max(0,1-Math.hypot(x-.5,y-.5)*1.7));}
+card.addEventListener('pointermove',e=>move(e.clientX,e.clientY));
+card.addEventListener('pointerleave',()=>{card.style.setProperty('--rx','0deg');card.style.setProperty('--ry','0deg');card.style.setProperty('--gloss','0');card.style.setProperty('--my','38%');});
+window.addEventListener('deviceorientation',e=>{if(e.gamma==null)return;
+  card.style.setProperty('--ry',Math.max(-18,Math.min(18,e.gamma))+'deg');
+  card.style.setProperty('--rx',Math.max(-18,Math.min(18,e.beta-45))+'deg');
+  card.style.setProperty('--mx',(50+e.gamma)+'%');card.style.setProperty('--my',(40+(e.beta-45))+'%');
+  card.style.setProperty('--gloss','.55');},true);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+export const CARD_BUILD_MESSAGES = [
+  "Polishing the card…",
+  "Applying holographic shine…",
+  "Buffing the refractor…",
+  "Heating the foil press…",
+  "Centering the portrait…",
+  "Calibrating the sparkle…",
+  "Wiping fingerprints off the slab…",
+  "Shaking the prizm flakes…",
+  "Teaching the card to catch light…",
+  "Laminating your legacy…",
+  "Arguing with the grading company…",
+  "Injecting +5 hype…",
+  "Removing the background (and the nerves)…",
+  "Almost ready for the big stage…",
+] as const;
