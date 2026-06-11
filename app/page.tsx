@@ -14,7 +14,7 @@ import {
   type Shine,
   type Finish,
 } from "@/lib/card";
-import { removePhotoBackground } from "@/lib/removeBackground";
+import { preloadBackgroundRemoval, removePhotoBackground } from "@/lib/removeBackground";
 import { CARD_BUILD_MESSAGES } from "@/lib/cardBuildMessages";
 
 import FlagImg from "@/components/FlagImg";
@@ -41,6 +41,7 @@ export default function Home() {
   const stageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    preloadBackgroundRemoval();
     return () => {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };

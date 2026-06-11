@@ -77,15 +77,22 @@ function pickSegmentationModel(): "isnet_fp16" | "isnet_quint8" | "isnet" {
   return "isnet_quint8";
 }
 
+function outputDimensions(origW: number, origH: number, maxSide: number) {
+  const longest = Math.max(origW, origH);
+  if (longest <= maxSide) return { w: origW, h: origH };
+  const scale = maxSide / longest;
+  return { w: Math.round(origW * scale), h: Math.round(origH * scale) };
+}
+
 /** Pad to a square canvas so the segmenter is not squashing tall subjects. */
 async function padPortraitForSegmentation(
   src: Blob,
-  maxSegSide = 1024
+  maxSegSide = 640
 ): Promise<PreparedPortrait> {
   const bitmap = await createImageBitmap(src);
   const { width, height } = bitmap;
   const side = Math.max(width, height);
-  const targetSide = Math.min(Math.max(side, 512), maxSegSide);
+  const targetSide = Math.min(Math.max(side, 384), maxSegSide);
   const scale = targetSide / side;
   const drawW = Math.round(width * scale);
   const drawH = Math.round(height * scale);
@@ -105,7 +112,8 @@ async function padPortraitForSegmentation(
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (out) => (out ? resolve(out) : reject(new Error("Failed to prepare image."))),
-      "image/png"
+      "image/jpeg",
+      0.9
     );
   });
 
@@ -332,6 +340,56 @@ function refineAlphaMask(
   return out;
 }
 
+/** Minimal edge cleanup — skips expensive morphology passes. */
+function refineAlphaMaskFast(rawAlpha: Uint8Array): Uint8Array {
+  const out = new Uint8Array(rawAlpha.length);
+  for (let i = 0; i < rawAlpha.length; i++) {
+    out[i] = reshapeAlpha(rawAlpha[i], true);
+  }
+  return out;
+}
+
+function estimateBackgroundCorners(
+  source: Uint8ClampedArray,
+  w: number,
+  h: number
+): [number, number, number] {
+  const points: [number, number][] = [
+    [0, 0],
+    [w - 1, 0],
+    [0, h - 1],
+    [w - 1, h - 1],
+  ];
+  let sr = 0;
+  let sg = 0;
+  let sb = 0;
+  for (const [x, y] of points) {
+    const idx = (y * w + x) * 4;
+    sr += source[idx];
+    sg += source[idx + 1];
+    sb += source[idx + 2];
+  }
+  return [sr / 4, sg / 4, sb / 4];
+}
+
+async function loadRgbaScaled(blob: Blob, w: number, h: number) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    throw new Error("Could not read image.");
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  const { data } = ctx.getImageData(0, 0, w, h);
+  return { data, w, h };
+}
+
 function cropAlpha(
   alpha: Uint8Array,
   w: number,
@@ -383,7 +441,12 @@ function resizeAlphaBilinear(
   return out;
 }
 
-function mapMaskToOriginal(prepared: PreparedPortrait, maskBlob: Blob): Promise<Uint8Array> {
+function mapMaskToOutput(
+  prepared: PreparedPortrait,
+  maskBlob: Blob,
+  maxSide: number
+): Promise<{ alpha: Uint8Array; w: number; h: number }> {
+  const { w: outW, h: outH } = outputDimensions(prepared.origW, prepared.origH, maxSide);
   return loadRgba(maskBlob).then(({ data, w, h }) => {
     const n = w * h;
     const preparedAlpha = new Uint8Array(n);
@@ -401,13 +464,8 @@ function mapMaskToOriginal(prepared: PreparedPortrait, maskBlob: Blob): Promise<
       prepared.drawH
     );
 
-    return resizeAlphaBilinear(
-      cropped,
-      prepared.drawW,
-      prepared.drawH,
-      prepared.origW,
-      prepared.origH
-    );
+    const alpha = resizeAlphaBilinear(cropped, prepared.drawW, prepared.drawH, outW, outH);
+    return { alpha, w: outW, h: outH };
   });
 }
 
@@ -460,68 +518,26 @@ function trimTransparentBounds(
   return { data: trimmed, w: tw, h: th };
 }
 
-type PolishOpts = {
-  fast?: boolean;
-  maxSide?: number;
-  onProgress?: (pct: number) => void;
-};
-
-async function preparePolishWorkset(
+/** Fast composite at display resolution — tuned for sub-10s turnaround. */
+async function polishCutoutFast(
   sourceBlob: Blob,
   alpha: Uint8Array,
   w: number,
   h: number,
-  maxSide?: number
-) {
-  const longest = Math.max(w, h);
-  if (!maxSide || longest <= maxSide) {
-    return { sourceBlob, alpha, w, h };
-  }
-
-  const scale = maxSide / longest;
-  const workW = Math.round(w * scale);
-  const workH = Math.round(h * scale);
-  const workAlpha = resizeAlphaBilinear(alpha, w, h, workW, workH);
-  const workBlob = await resizeImageBlob(sourceBlob, workW, workH);
-  return { sourceBlob: workBlob, alpha: workAlpha, w: workW, h: workH };
-}
-
-/** Composite original colors with a refined matte and remove background spill. */
-async function polishCutout(
-  sourceBlob: Blob,
-  alpha: Uint8Array,
-  w: number,
-  h: number,
-  opts?: PolishOpts
+  onProgress?: (pct: number) => void
 ): Promise<Blob> {
-  const fast = opts?.fast ?? false;
-  opts?.onProgress?.(0);
+  onProgress?.(0);
+  const { data: src } = await loadRgbaScaled(sourceBlob, w, h);
+  const n = w * h;
 
-  const work = await preparePolishWorkset(sourceBlob, alpha, w, h, fast ? opts?.maxSide : undefined);
-  const source = await loadRgba(work.sourceBlob);
-  if (source.w !== work.w || source.h !== work.h) {
-    throw new Error("Cutout mask size mismatch.");
-  }
+  onProgress?.(0.35);
+  const refinedAlpha = refineAlphaMaskFast(alpha);
+  const bg = estimateBackgroundCorners(src, w, h);
 
-  const { data: src } = source;
-  const workW = work.w;
-  const workH = work.h;
-  const n = workW * workH;
-
-  opts?.onProgress?.(0.2);
-  const gentle = needsGentlePolish(work.alpha, workW, workH);
-  let refinedAlpha = refineAlphaMask(work.alpha, workW, workH, gentle);
-  const bg = estimateBackground(src, refinedAlpha, workW, workH);
-
-  opts?.onProgress?.(0.45);
-  if (!fast) {
-    trimBackgroundFringe(refinedAlpha, src, bg, gentle);
-  }
-
-  opts?.onProgress?.(0.7);
+  onProgress?.(0.7);
   const out = new Uint8ClampedArray(src.length);
   for (let i = 0; i < n; i++) {
-    let a = refinedAlpha[i];
+    const a = refinedAlpha[i];
     const idx = i * 4;
     if (a <= 0) continue;
 
@@ -529,7 +545,7 @@ async function polishCutout(
     let g = src[idx + 1];
     let b = src[idx + 2];
 
-    if (a < 252) {
+    if (a < 235) {
       [r, g, b] = decontaminate(r, g, b, a, bg);
     }
 
@@ -539,29 +555,18 @@ async function polishCutout(
     out[idx + 3] = a;
   }
 
-  if (!fast) {
-    const haloCutoff = gentle ? 20 : 28;
-    const haloAlphaMax = gentle ? 130 : 160;
-    for (let i = 0; i < n; i++) {
-      const a = out[i * 4 + 3];
-      if (a <= 0 || a >= haloAlphaMax) continue;
-      const idx = i * 4;
-      const dr = out[idx] - bg[0];
-      const dg = out[idx + 1] - bg[1];
-      const db = out[idx + 2] - bg[2];
-      if (Math.hypot(dr, dg, db) < haloCutoff) {
-        out[idx + 3] = 0;
-      }
-    }
+  onProgress?.(1);
+  return rgbaToPng(out, w, h);
+}
+
+let segmenterModule: Promise<typeof import("@imgly/background-removal")> | null = null;
+
+/** Warm ONNX + WASM while the user is on the page. */
+export function preloadBackgroundRemoval() {
+  if (!segmenterModule) {
+    segmenterModule = import("@imgly/background-removal");
   }
-
-  opts?.onProgress?.(0.85);
-  const trimmed = fast
-    ? { data: out, w: workW, h: workH }
-    : trimTransparentBounds(out, workW, workH, gentle ? 16 : 10);
-
-  opts?.onProgress?.(1);
-  return rgbaToPng(trimmed.data, trimmed.w, trimmed.h);
+  return segmenterModule;
 }
 
 export type RemoveBgCallbacks = {
@@ -577,60 +582,45 @@ function normalizeCallbacks(
   return callbacks ?? {};
 }
 
-const PREVIEW_MAX_SIDE = 1280;
-const SEG_MAX_SIDE = 1024;
+const OUTPUT_MAX_SIDE = 1024;
+const SEG_MAX_SIDE = 640;
 
 export async function removePhotoBackground(
   src: Blob | string,
   callbacks?: RemoveBgCallbacks | ((pct: number) => void)
 ): Promise<Blob> {
   const { onProgress, onPreview } = normalizeCallbacks(callbacks);
-  const { segmentForeground } = await import("@imgly/background-removal");
+  const { segmentForeground } = await (segmenterModule ?? import("@imgly/background-removal"));
 
   const report = (pct: number) => onProgress?.(Math.min(100, Math.round(pct)));
   const config = {
     model: pickSegmentationModel(),
     device: hasWebGpu() ? ("gpu" as const) : ("cpu" as const),
     proxyToWorker: true,
-    output: { format: "image/png" as const, quality: 1 },
+    output: { format: "image/png" as const, quality: 0.92 },
   };
 
   report(2);
   const originalBlob = await toBlob(src);
   const prepared = await padPortraitForSegmentation(originalBlob, SEG_MAX_SIDE);
-  report(8);
+  report(10);
 
   const mask = await segmentForeground(prepared.blob, {
     ...config,
     progress: (_key, current, total) => {
-      if (total > 0) report(8 + (current / total) * 58);
+      if (total > 0) report(10 + (current / total) * 62);
     },
   });
 
-  report(68);
-  const fullResAlpha = await mapMaskToOriginal(prepared, mask);
-  report(72);
+  report(74);
+  const { alpha, w, h } = await mapMaskToOutput(prepared, mask, OUTPUT_MAX_SIDE);
+  report(78);
 
-  if (onPreview) {
-    const preview = await polishCutout(
-      originalBlob,
-      fullResAlpha,
-      prepared.origW,
-      prepared.origH,
-      {
-        fast: true,
-        maxSide: PREVIEW_MAX_SIDE,
-        onProgress: (p) => report(72 + p * 18),
-      }
-    );
-    onPreview(preview);
-    report(90);
-  }
+  const cutout = await polishCutoutFast(originalBlob, alpha, w, h, (p) =>
+    report(78 + p * 20)
+  );
 
-  const final = await polishCutout(originalBlob, fullResAlpha, prepared.origW, prepared.origH, {
-    fast: false,
-    onProgress: (p) => report((onPreview ? 90 : 72) + p * (onPreview ? 10 : 28)),
-  });
+  onPreview?.(cutout);
   report(100);
-  return final;
+  return cutout;
 }
