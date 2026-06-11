@@ -201,20 +201,22 @@ export default function Home() {
         <div className="composer">
         <div className="cardColumn">
           <div className="cardPreview">
-            <HoloCard
-              stageRef={stageRef}
-              name={name}
-              team={team}
-              cardStyle={cardStyle}
-              shine={shine}
-              finish={finish}
-              photoUrl={photoUrl}
-              photoCutout={photoCutout}
-              photoSoftBackground={photoSoftBackground}
-              processing={processing}
-              processingMessage={CARD_BUILD_MESSAGES[buildMsgIdx]}
-              processingProgress={photoProgress}
-            />
+            <div className="cardPreviewScale">
+              <HoloCard
+                stageRef={stageRef}
+                name={name}
+                team={team}
+                cardStyle={cardStyle}
+                shine={shine}
+                finish={finish}
+                photoUrl={photoUrl}
+                photoCutout={photoCutout}
+                photoSoftBackground={photoSoftBackground}
+                processing={processing}
+                processingMessage={CARD_BUILD_MESSAGES[buildMsgIdx]}
+                processingProgress={photoProgress}
+              />
+            </div>
           </div>
           <div className="buyBar">
             <BuyCardPanel

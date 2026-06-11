@@ -82,36 +82,70 @@ body > *{ position:relative; z-index:1; }
 .panel{ animation:riseIn .7s var(--ease-out) .16s both; }
 .buyBar .buyBtnWrap{ animation:riseIn .7s var(--ease-out) .24s both; }
 
-@media (max-width:720px){
-  body{ padding-bottom:32px; }
+.cardPreviewScale{
+  width:336px;
+  max-width:100%;
+}
 
-  .shell{ gap:26px; }
+@media (max-width:720px){
+  body{
+    align-items:stretch;
+    justify-content:flex-start;
+    padding:10px 16px 28px;
+  }
+
+  .shell{ gap:12px; max-width:100%; }
+
+  .masthead{ gap:4px; }
+  .mastheadEyebrow{ font-size:9px; letter-spacing:.32em; }
+  .mastheadTitle{ font-size:clamp(22px, 6.5vw, 28px); }
 
   .composer{
     flex-direction:column;
-    align-items:center;
-    gap:28px;
+    align-items:stretch;
+    gap:14px;
   }
   .cardColumn{ display:contents; }
+
   .cardPreview{
+    --card-mobile-scale:min(1, calc((100vw - 32px) / 336), calc(36vh / 470));
     order:1;
-    width:336px;
+    position:sticky;
+    top:0;
+    z-index:30;
+    width:100%;
     max-width:100%;
+    display:flex;
+    justify-content:center;
+    padding:4px 0 6px;
     overflow:visible;
-    /* Room for idle float + 3D tilt so the card isn't clipped at the top */
-    padding:22px 12px 10px;
-    box-sizing:content-box;
+    background:linear-gradient(180deg, rgba(6,7,9,.98) 0%, rgba(6,7,9,.94) 78%, rgba(6,7,9,0) 100%);
   }
+  .cardPreviewScale{
+    transform:scale(var(--card-mobile-scale));
+    transform-origin:top center;
+    margin-bottom:calc(470px * var(--card-mobile-scale) - 470px);
+  }
+
   .panel{
     order:2;
     width:100%;
-    max-width:336px;
+    max-width:100%;
+    padding-bottom:72px;
   }
+  .panel label:first-of-type{ margin-top:8px; }
+  .panel label{ margin:14px 0 6px; }
+
   .buyBar{
     order:3;
     width:100%;
-    max-width:336px;
-    margin-top:4px;
+    max-width:100%;
+    margin-top:0;
+    position:sticky;
+    bottom:10px;
+    z-index:25;
+    padding-top:4px;
+    background:linear-gradient(0deg, rgba(6,7,9,.98) 0%, rgba(6,7,9,.92) 72%, rgba(6,7,9,0) 100%);
   }
 }
 
