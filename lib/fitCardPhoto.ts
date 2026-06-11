@@ -1,8 +1,8 @@
 /** Card layout constants — keep in sync with HoloCard.module.css */
 const CARD_W = 336;
 const CARD_H = 470;
-/** Global size trim applied after fit (0.8 = 20% smaller). */
-const PHOTO_SIZE = 0.8;
+/** Global size trim applied after fit. */
+const PHOTO_SIZE = 1;
 
 /** Visible art area — below header copy, above name block. */
 const SAFE = {
@@ -96,9 +96,9 @@ function fitSubjectInSafeZone(
   const availH = CARD_H - SAFE.top - SAFE.bottom;
   const safeBottomY = CARD_H - SAFE.bottom;
   const shape = classifySubject(bounds);
-  const fill = shape === "wide" ? 0.92 : shape === "balanced" ? 0.86 : 0.78;
-  const marginTop = shape === "wide" ? 8 : 12;
-  const marginBottom = shape === "wide" ? 8 : 12;
+  const fill = shape === "wide" ? 0.96 : shape === "balanced" ? 0.94 : 0.9;
+  const marginTop = shape === "wide" ? 6 : 8;
+  const marginBottom = shape === "wide" ? 6 : 8;
   const centerFrac = shape === "portrait" ? 0.52 : 0.5;
 
   const topPad =
@@ -109,10 +109,10 @@ function fitSubjectInSafeZone(
 
   const scaleFromHeight = (availH * fill) / spanH;
   const scaleFromWidth = (availW * fill) / bounds.subjectW;
-  const maxScale = Math.min(scaleFromHeight, scaleFromWidth) * 0.96;
+  const maxScale = Math.min(scaleFromHeight, scaleFromWidth);
 
-  const minW = shape === "wide" ? CARD_W * 0.92 : CARD_W * 0.95;
-  const maxW = shape === "wide" ? CARD_W * 1.72 : CARD_W * 1.58;
+  const minW = shape === "wide" ? CARD_W * 0.98 : CARD_W * 1;
+  const maxW = shape === "wide" ? CARD_W * 1.85 : CARD_W * 1.75;
   const displayW = clamp(maxScale * imgW, minW, maxW) * PHOTO_SIZE;
   const scale = displayW / imgW;
   const imgTop = (CARD_H - imgH * scale) / 2;
@@ -147,7 +147,7 @@ function fitSubjectInSafeZone(
 
 /** Size and position a cutout subject for the holo card art zone. */
 export async function analyzeCardPhotoFit(src: string): Promise<CardPhotoFit> {
-  const fallback: CardPhotoFit = { widthPct: 114, translateY: 12 };
+  const fallback: CardPhotoFit = { widthPct: 132, translateY: 8 };
 
   try {
     const { data, w, h } = await loadImageData(src);

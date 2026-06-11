@@ -228,7 +228,7 @@
 }
 .photoImg{
   display:block;
-  width:var(--photo-width, 114%);
+  width:var(--photo-width, 132%);
   height:auto;
   max-width:none;
   max-height:none;

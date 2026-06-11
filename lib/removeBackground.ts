@@ -44,6 +44,61 @@ function buildConfig(onProgress?: (pct: number) => void): Config {
   };
 }
 
+async function trimTransparentCutout(blob: Blob, pad = 10): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob);
+  const w = bitmap.width;
+  const h = bitmap.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return blob;
+  }
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const { data } = ctx.getImageData(0, 0, w, h);
+  let minX = w;
+  let minY = h;
+  let maxX = 0;
+  let maxY = 0;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] <= 12) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return blob;
+
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(w - 1, maxX + pad);
+  maxY = Math.min(h - 1, maxY + pad);
+
+  const tw = maxX - minX + 1;
+  const th = maxY - minY + 1;
+  const out = document.createElement("canvas");
+  out.width = tw;
+  out.height = th;
+  const outCtx = out.getContext("2d");
+  if (!outCtx) return blob;
+  outCtx.drawImage(canvas, minX, minY, tw, th, 0, 0, tw, th);
+
+  return new Promise((resolve, reject) => {
+    out.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Failed to trim cutout."))),
+      "image/png"
+    );
+  });
+}
+
 async function resizeToMaxSide(blob: Blob, maxSide: number): Promise<Blob> {
   const bitmap = await createImageBitmap(blob);
   const { width, height } = bitmap;
@@ -121,7 +176,8 @@ export async function removePhotoBackground(
   const work = await resizeToMaxSide(original, WORK_MAX_SIDE);
   report(12);
 
-  const cutout = await removeBackground(work, buildConfig(onProgress));
+  const raw = await removeBackground(work, buildConfig(onProgress));
+  const cutout = await trimTransparentCutout(raw);
 
   onPreview?.(cutout);
   report(100);
