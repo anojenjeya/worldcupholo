@@ -47,21 +47,15 @@ export default function Home() {
     };
   }, []);
 
-  const applyCutout = (blob: Blob) => {
+  const applyPhoto = (blob: Blob, cutout: boolean) => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(blob);
     objectUrlRef.current = url;
     setPhotoUrl(url);
-    setPhotoCutout(true);
+    setPhotoCutout(cutout);
   };
 
-  const showRawPhoto = (blob: Blob) => {
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(blob);
-    objectUrlRef.current = url;
-    setPhotoUrl(url);
-    setPhotoCutout(false);
-  };
+  const showRawPhoto = (blob: Blob) => applyPhoto(blob, false);
 
   const processPhoto = async (src: Blob | string) => {
     const gen = ++processGenRef.current;
@@ -85,16 +79,16 @@ export default function Home() {
         showRawPhoto(input);
       }
 
-      const cutout = await removePhotoBackground(input, {
+      const result = await removePhotoBackground(input, {
         onProgress: setPhotoProgress,
         onPreview: (preview) => {
           if (gen !== processGenRef.current) return;
-          applyCutout(preview);
+          applyPhoto(preview.blob, preview.cutout);
           setProcessing(false);
         },
       });
       if (gen !== processGenRef.current) return;
-      applyCutout(cutout);
+      applyPhoto(result.blob, result.cutout);
     } catch (err) {
       console.error("Background removal failed:", err);
       if (gen !== processGenRef.current) return;

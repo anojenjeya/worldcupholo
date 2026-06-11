@@ -147,10 +147,90 @@ export function preloadBackgroundRemoval() {
   return preloadPromise;
 }
 
+export type PhotoProcessResult = {
+  blob: Blob;
+  /** False for scenic / background-heavy shots — show the full photo on the card. */
+  cutout: boolean;
+};
+
 export type RemoveBgCallbacks = {
   onProgress?: (pct: number) => void;
-  onPreview?: (blob: Blob) => void;
+  onPreview?: (result: PhotoProcessResult) => void;
 };
+
+type AlphaBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  subjectW: number;
+  subjectH: number;
+};
+
+async function getImageSize(blob: Blob) {
+  const bitmap = await createImageBitmap(blob);
+  const size = { w: bitmap.width, h: bitmap.height };
+  bitmap.close();
+  return size;
+}
+
+async function measureMaskBounds(maskBlob: Blob, threshold = 40): Promise<AlphaBounds | null> {
+  const bitmap = await createImageBitmap(maskBlob);
+  const w = bitmap.width;
+  const h = bitmap.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return null;
+  }
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const { data } = ctx.getImageData(0, 0, w, h);
+  let minX = w;
+  let minY = h;
+  let maxX = 0;
+  let maxY = 0;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = data[(y * w + x) * 4 + 3];
+      if (a < threshold) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return null;
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    subjectW: maxX - minX + 1,
+    subjectH: maxY - minY + 1,
+  };
+}
+
+/** Skip cutout when the scene/background is a major part of the photo. */
+function isBackgroundDominantScene(bounds: AlphaBounds, imgW: number, imgH: number): boolean {
+  const coverage = (bounds.subjectW * bounds.subjectH) / (imgW * imgH);
+  const heightRatio = bounds.subjectH / imgH;
+  const imgAspect = imgW / imgH;
+
+  if (coverage < 0.36) return true;
+  if (heightRatio < 0.5 && coverage < 0.54) return true;
+  if (imgAspect > 1.08 && coverage < 0.46) return true;
+  if (heightRatio < 0.64 && bounds.minY > imgH * 0.07) return true;
+
+  return false;
+}
 
 function normalizeCallbacks(
   callbacks?: RemoveBgCallbacks | ((pct: number) => void)
@@ -162,13 +242,14 @@ function normalizeCallbacks(
 export async function removePhotoBackground(
   src: Blob | string,
   callbacks?: RemoveBgCallbacks | ((pct: number) => void)
-): Promise<Blob> {
+): Promise<PhotoProcessResult> {
   const { onProgress, onPreview } = normalizeCallbacks(callbacks);
   const report = (pct: number) => onProgress?.(Math.min(100, Math.round(pct)));
 
   await preloadBackgroundRemoval().catch(() => undefined);
 
-  const { removeBackground } = await importBgRemoval();
+  const { segmentForeground, applySegmentationMask } = await importBgRemoval();
+  const config = buildConfig(onProgress);
 
   report(2);
   const original = await toBlob(src);
@@ -176,10 +257,24 @@ export async function removePhotoBackground(
   const work = await resizeToMaxSide(original, WORK_MAX_SIDE);
   report(12);
 
-  const raw = await removeBackground(work, buildConfig(onProgress));
-  const cutout = await trimTransparentCutout(raw);
+  const mask = await segmentForeground(work, config);
+  report(78);
 
-  onPreview?.(cutout);
+  const { w, h } = await getImageSize(work);
+  const bounds = await measureMaskBounds(mask);
+  if (bounds && isBackgroundDominantScene(bounds, w, h)) {
+    const kept: PhotoProcessResult = { blob: work, cutout: false };
+    onPreview?.(kept);
+    report(100);
+    return kept;
+  }
+
+  const raw = await applySegmentationMask(work, mask, config);
+  report(92);
+  const cutoutBlob = await trimTransparentCutout(raw);
+  const result: PhotoProcessResult = { blob: cutoutBlob, cutout: true };
+
+  onPreview?.(result);
   report(100);
-  return cutout;
+  return result;
 }

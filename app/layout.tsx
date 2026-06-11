@@ -31,13 +31,43 @@ const sairaCondensed = Saira_Condensed({
   variable: "--font-saira-condensed",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://wccard.xyz";
+
+const title = "Holo Card Studio";
+const description =
+  "Design your holographic World Cup 2026 trading card — upload a photo, pick your country, and download a free holo video.";
+
 export const metadata: Metadata = {
-  title: "Holo Card Studio",
-  description:
-    "Design your holographic World Cup 2026 trading card and download a free 10s holo video.",
+  metadataBase: new URL(siteUrl),
+  title,
+  description,
+  applicationName: title,
+  keywords: [
+    "World Cup 2026",
+    "holographic card",
+    "trading card",
+    "soccer",
+    "football",
+    "holo video",
+  ],
   openGraph: {
-    title: "Holo Card Studio",
-    description: "Create a personalized holo card and download your video.",
+    type: "website",
+    url: siteUrl,
+    siteName: title,
+    title,
+    description,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
+  appleWebApp: {
+    title,
+    capable: true,
+    statusBarStyle: "black-translucent",
   },
 };
 
