@@ -54,6 +54,14 @@ export default function Home() {
     setPhotoCutout(true);
   };
 
+  const showRawPhoto = (blob: Blob) => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(blob);
+    objectUrlRef.current = url;
+    setPhotoUrl(url);
+    setPhotoCutout(false);
+  };
+
   const processPhoto = async (src: Blob | string) => {
     const gen = ++processGenRef.current;
     setBuildMsgIdx(Math.floor(Math.random() * CARD_BUILD_MESSAGES.length));
@@ -70,7 +78,20 @@ export default function Home() {
             })
           : src;
 
-      const cutout = await removePhotoBackground(input, setPhotoProgress);
+      if (typeof src === "string") {
+        setPhotoUrl(src);
+      } else {
+        showRawPhoto(input);
+      }
+
+      const cutout = await removePhotoBackground(input, {
+        onProgress: setPhotoProgress,
+        onPreview: (preview) => {
+          if (gen !== processGenRef.current) return;
+          applyCutout(preview);
+          setProcessing(false);
+        },
+      });
       if (gen !== processGenRef.current) return;
       applyCutout(cutout);
     } catch (err) {

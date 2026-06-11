@@ -11,12 +11,12 @@
   "dependencies": {
     "@imgly/background-removal": "^1.7.0",
     "modern-screenshot": "^4.7.0",
+    "mp4-muxer": "^5.2.2",
     "next": "^16.2.7",
     "onnxruntime-web": "^1.21.0",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "stripe": "^22.2.0",
-    "webm-muxer": "^5.1.4"
+    "stripe": "^22.2.0"
   },
   "devDependencies": {
     "@types/node": "^20",

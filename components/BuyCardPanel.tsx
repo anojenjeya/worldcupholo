@@ -9,7 +9,12 @@ import {
   type SharePlatform,
 } from "@/lib/cardShareUrl";
 import { waitForCardReady } from "@/lib/waitForCardReady";
-import { recordCardVideo, RecordAbortedError } from "@/lib/recordCardVideo";
+import {
+  recordCardVideo,
+  RecordAbortedError,
+  videoDownloadFilename,
+  videoFileExtension,
+} from "@/lib/recordCardVideo";
 import { resetCardPointerState } from "@/lib/cardPointerState";
 import CheckoutModal from "@/components/CheckoutModal";
 
@@ -177,12 +182,12 @@ export default function BuyCardPanel({
 
   const downloadVideo = useCallback(() => {
     const url = videoUrlRef.current;
-    if (!url) return;
+    if (!videoBlob || !url) return;
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slug || "world-cup-card"}.webm`;
+    a.download = videoDownloadFilename(slug, videoBlob);
     a.click();
-  }, [slug]);
+  }, [slug, videoBlob]);
 
   const generateAndDownload = useCallback(async () => {
     if (rendering) return;
@@ -234,7 +239,8 @@ export default function BuyCardPanel({
 
   const shareNative = async () => {
     if (!videoBlob) return;
-    const file = new File([videoBlob], "world-cup-card.webm", { type: videoBlob.type });
+    const ext = videoFileExtension(videoBlob);
+    const file = new File([videoBlob], `world-cup-card.${ext}`, { type: videoBlob.type });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       await navigator.share({
         title: "World Cup 2026 Holo Card",

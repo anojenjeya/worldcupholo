@@ -250,27 +250,6 @@ export default function HoloCard({
 
   return (
     <div ref={stageRef} className={styles.stage}>
-      {processing && (
-        <div className={styles.processing} data-recording-hide>
-          <div className={styles.processingInner}>
-            <p className={styles.processingMsg} aria-live="polite">
-              {processingMessage}
-            </p>
-            <div
-              className={styles.processingTrack}
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={processingProgress}
-            >
-              <div
-                className={styles.processingBar}
-                style={{ transform: `scaleX(${Math.min(100, Math.max(0, processingProgress)) / 100})` }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
       <div
         ref={cardRef}
         data-card-root
@@ -379,6 +358,30 @@ export default function HoloCard({
             ) : null}
           </div>
         </div>
+
+        {processing ? (
+          <div className={styles.processing} data-recording-hide>
+            <div className={styles.processingInner}>
+              <p className={styles.processingMsg} aria-live="polite">
+                {processingMessage}
+              </p>
+              <div
+                className={styles.processingTrack}
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={processingProgress}
+              >
+                <div
+                  className={styles.processingBar}
+                  style={{
+                    transform: `scaleX(${Math.min(100, Math.max(0, processingProgress)) / 100})`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

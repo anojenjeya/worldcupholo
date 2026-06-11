@@ -1,5 +1,5 @@
 import { createContext, destroyContext, domToCanvas } from "modern-screenshot";
-import { ArrayBufferTarget, Muxer } from "webm-muxer";
+import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 import {
   applyCardPointerState,
   choreographHoverAt,
@@ -45,8 +45,23 @@ async function waitForPaint() {
 }
 
 function pickMimeType() {
-  const types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  const types = [
+    "video/mp4",
+    "video/mp4;codecs=avc1",
+    "video/mp4;codecs=h264",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
   return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "video/webm";
+}
+
+export function videoFileExtension(blob: Blob): "mp4" | "webm" {
+  return blob.type.includes("mp4") ? "mp4" : "webm";
+}
+
+export function videoDownloadFilename(slug: string, blob: Blob) {
+  return `${slug || "world-cup-card"}.${videoFileExtension(blob)}`;
 }
 
 type FrameLayout = {
@@ -123,8 +138,8 @@ function applyRecordPointer(
   });
 }
 
-async function pickVideoCodec(width: number, height: number, fps: number) {
-  const candidates = ["vp09.00.10.08", "vp8"];
+async function pickH264Codec(width: number, height: number, fps: number) {
+  const candidates = ["avc1.42001f", "avc1.4D401F", "avc1.640028", "avc1.64001f"];
   for (const codec of candidates) {
     if (typeof VideoEncoder === "undefined") break;
     const result = await VideoEncoder.isConfigSupported({
@@ -134,7 +149,7 @@ async function pickVideoCodec(width: number, height: number, fps: number) {
       bitrate: 12_000_000,
       framerate: fps,
     });
-    if (result.supported) return { codec, codecString: codec === "vp09.00.10.08" ? "V_VP9" : "V_VP8" };
+    if (result.supported) return codec;
   }
   return null;
 }
@@ -146,20 +161,21 @@ async function encodeWithWebCodecs(
   captureFrame: (index: number) => Promise<void>,
   onProgress?: (progress: number) => void,
   shouldAbort?: () => boolean
-): Promise<Blob> {
+): Promise<Blob | null> {
   const { canvas } = layout;
-  const picked = await pickVideoCodec(canvas.width, canvas.height, fps);
-  if (!picked) throw new Error("WebCodecs encoder is not available.");
+  const codec = await pickH264Codec(canvas.width, canvas.height, fps);
+  if (!codec) return null;
 
   const target = new ArrayBufferTarget();
   const muxer = new Muxer({
     target,
     video: {
-      codec: picked.codecString,
+      codec: "avc",
       width: canvas.width,
       height: canvas.height,
       frameRate: fps,
     },
+    fastStart: "in-memory",
     firstTimestampBehavior: "offset",
   });
 
@@ -171,7 +187,7 @@ async function encodeWithWebCodecs(
   });
 
   encoder.configure({
-    codec: picked.codec,
+    codec,
     width: canvas.width,
     height: canvas.height,
     bitrate: 12_000_000,
@@ -193,7 +209,7 @@ async function encodeWithWebCodecs(
 
     await encoder.flush();
     muxer.finalize();
-    return new Blob([target.buffer], { type: "video/webm" });
+    return new Blob([target.buffer], { type: "video/mp4" });
   } finally {
     encoder.close();
   }
@@ -324,7 +340,7 @@ export async function recordCardVideo({
     };
 
     if (supportsWebCodecs()) {
-      return await encodeWithWebCodecs(
+      const mp4 = await encodeWithWebCodecs(
         layout,
         fps,
         frameCount,
@@ -332,6 +348,7 @@ export async function recordCardVideo({
         onProgress,
         shouldAbort
       );
+      if (mp4) return mp4;
     }
 
     return await encodeWithMediaRecorder(

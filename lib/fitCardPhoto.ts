@@ -37,7 +37,7 @@ function measureAlphaBounds(data: Uint8ClampedArray, w: number, h: number): Alph
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] <= 16) continue;
+      if (data[(y * w + x) * 4 + 3] <= 12) continue;
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x);
@@ -78,6 +78,15 @@ async function loadImageData(src: string) {
   return { data, w, h };
 }
 
+type SubjectShape = "portrait" | "balanced" | "wide";
+
+function classifySubject(bounds: AlphaBounds): SubjectShape {
+  const aspect = bounds.subjectW / bounds.subjectH;
+  if (aspect > 1.12) return "wide";
+  if (aspect < 0.72) return "portrait";
+  return "balanced";
+}
+
 function fitSubjectInSafeZone(
   bounds: AlphaBounds,
   imgW: number,
@@ -86,52 +95,46 @@ function fitSubjectInSafeZone(
   const availW = CARD_W - SAFE.side * 2;
   const availH = CARD_H - SAFE.top - SAFE.bottom;
   const safeBottomY = CARD_H - SAFE.bottom;
-  const marginTop = 12;
-  const marginBottom = 12;
-  const fill = 0.78;
+  const shape = classifySubject(bounds);
+  const fill = shape === "wide" ? 0.92 : shape === "balanced" ? 0.86 : 0.78;
+  const marginTop = shape === "wide" ? 8 : 12;
+  const marginBottom = shape === "wide" ? 8 : 12;
+  const centerFrac = shape === "portrait" ? 0.52 : 0.5;
 
-  const headPad = Math.round(bounds.subjectH * 0.05);
-  const topY = Math.max(0, bounds.minY - headPad);
+  const topPad =
+    shape === "portrait" ? Math.round(bounds.subjectH * 0.05) : Math.round(bounds.subjectH * 0.02);
+  const topY = Math.max(0, bounds.minY - topPad);
   const bottomY = bounds.maxY;
   const spanH = Math.max(bottomY - topY, 1);
-  const imgMid = imgH / 2;
-  const cardMid = CARD_H / 2;
 
   const scaleFromHeight = (availH * fill) / spanH;
   const scaleFromWidth = (availW * fill) / bounds.subjectW;
-  const scaleFromBottom = (safeBottomY - marginBottom - cardMid) / (bottomY - imgMid);
-  const scaleFromTop = (SAFE.top + marginTop - cardMid) / (topY - imgMid);
+  const maxScale = Math.min(scaleFromHeight, scaleFromWidth) * 0.96;
 
-  let maxScale = Math.min(scaleFromHeight, scaleFromWidth);
-
-  if (bottomY > imgMid && scaleFromBottom > 0) {
-    maxScale = Math.min(maxScale, scaleFromBottom);
-  }
-  if (topY < imgMid && scaleFromTop > 0) {
-    maxScale = Math.min(maxScale, scaleFromTop);
-  }
-
-  maxScale *= 0.96;
-
-  let displayW = clamp(maxScale * imgW, CARD_W * 0.95, CARD_W * 1.58) * PHOTO_SIZE;
+  const minW = shape === "wide" ? CARD_W * 0.92 : CARD_W * 0.95;
+  const maxW = shape === "wide" ? CARD_W * 1.72 : CARD_W * 1.58;
+  const displayW = clamp(maxScale * imgW, minW, maxW) * PHOTO_SIZE;
   const scale = displayW / imgW;
   const imgTop = (CARD_H - imgH * scale) / 2;
 
-  const subTop = imgTop + topY * scale;
-  const subBottom = imgTop + bottomY * scale;
-  const subCenter = (subTop + subBottom) / 2;
-  const targetCenter = SAFE.top + availH * 0.52;
+  const subjectCenterY = (bounds.minY + bounds.maxY) / 2;
+  const subCenterOnCard = imgTop + subjectCenterY * scale;
+  const targetCenter = SAFE.top + availH * centerFrac;
 
-  let translateY = targetCenter - subCenter;
+  let translateY = targetCenter - subCenterOnCard;
 
-  let top = subTop + translateY;
-  if (top < SAFE.top + marginTop) translateY += SAFE.top + marginTop - top;
+  const subTop = imgTop + bounds.minY * scale + translateY;
+  const subBottom = imgTop + bounds.maxY * scale + translateY;
 
-  let bottom = subBottom + translateY;
-  if (bottom > safeBottomY - marginBottom) translateY -= bottom - (safeBottomY - marginBottom);
+  if (subTop < SAFE.top + marginTop) {
+    translateY += SAFE.top + marginTop - subTop;
+  }
+  if (subBottom > safeBottomY - marginBottom) {
+    translateY -= subBottom - (safeBottomY - marginBottom);
+  }
 
-  top = subTop + translateY;
-  bottom = subBottom + translateY;
+  const top = imgTop + bounds.minY * scale + translateY;
+  const bottom = imgTop + bounds.maxY * scale + translateY;
   if (top < SAFE.top + marginTop || bottom > safeBottomY - marginBottom) {
     return null;
   }
@@ -142,7 +145,7 @@ function fitSubjectInSafeZone(
   };
 }
 
-/** Size and position a cutout portrait for the holo card art zone. */
+/** Size and position a cutout subject for the holo card art zone. */
 export async function analyzeCardPhotoFit(src: string): Promise<CardPhotoFit> {
   const fallback: CardPhotoFit = { widthPct: 114, translateY: 12 };
 
