@@ -261,12 +261,47 @@
 /* Scenic / environment shots — background already dimmed in the composite. */
 .photoScenic{
   display:block;
+  z-index:4;
   background-size:cover; background-position:center 22%;
   background-repeat:no-repeat;
-  filter:contrast(1.04) brightness(1) saturate(1.02)
+  filter:contrast(1.04) brightness(.98) saturate(1.04)
          drop-shadow(0 10px 28px rgba(0,0,0,.42));
   -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 88%, transparent 100%);
           mask-image:linear-gradient(180deg, #000 0%, #000 88%, transparent 100%);
+}
+
+/* Full-photo cards: foil + facets render ON TOP of the image. */
+.artSceneScenic .photoBackdrop{ opacity:0; }
+.artSceneScenic .facets,
+.artSceneScenic .holo,
+.artSceneScenic .holo2{
+  z-index:5;
+}
+.artSceneScenic .facets{
+  opacity:.58;
+  mix-blend-mode:overlay;
+}
+.artSceneScenic .holo{
+  mix-blend-mode:soft-light;
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 1.55);
+}
+.artSceneScenic .holo2{
+  mix-blend-mode:color-dodge;
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 1.45);
+}
+.artSceneScenic .fullArtFade{
+  z-index:6;
+  opacity:.62;
+}
+.artSceneScenic .photoShine{
+  z-index:7;
+}
+.card[data-active] .artSceneScenic .holo{
+  mix-blend-mode:color-dodge;
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 1.72);
+}
+.card[data-active] .artSceneScenic .holo2{
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 1.62);
 }
 .photo.empty{
   display:block;
@@ -310,6 +345,22 @@
     radial-gradient(ellipse 72% 88% at 50% 42%, #000 52%, transparent 78%),
     linear-gradient(180deg, #000 0%, #000 82%, transparent 98%);
   -webkit-mask-composite:source-in; mask-composite:intersect;
+}
+.photoShineScenic{
+  mix-blend-mode:soft-light;
+  opacity:calc((0.16 + var(--glow) * 0.14) * var(--shineOpMul, 1));
+  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 94%, transparent 100%);
+          mask-image:linear-gradient(180deg, #000 0%, #000 94%, transparent 100%);
+}
+.card[data-active] .photoShineScenic{
+  mix-blend-mode:color-dodge;
+  opacity:calc((0.22 + var(--glow) * 0.16) * var(--shineOpMul, 1));
+}
+.galaxy .photoShineScenic{
+  opacity:calc((0.14 + var(--glow) * 0.12) * var(--shineOpMul, 1));
+}
+.card[data-active].galaxy .photoShineScenic{
+  opacity:calc((0.2 + var(--glow) * 0.15) * var(--shineOpMul, 1));
 }
 .card[data-active] .photoShine{
   mix-blend-mode:color-dodge;

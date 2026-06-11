@@ -269,7 +269,11 @@ export default function HoloCard({
         }
       >
         <div className={`${styles.layer} ${styles.bg}`} />
-        <div className={styles.artScene}>
+        <div
+          className={`${styles.artScene}${
+            photoSoftBackground && photoUrl && !photoCutout ? ` ${styles.artSceneScenic}` : ""
+          }`}
+        >
           <div className={`${styles.layer} ${styles.fullArt}`} />
           <div className={`${styles.layer} ${styles.fullArtSpecks}`} />
           <div className={`${styles.layer} ${styles.facets}`} />
@@ -315,7 +319,11 @@ export default function HoloCard({
           {photoUrl ? (
             <div
               className={`${styles.layer} ${styles.photoShine}${
-                photoCutout ? "" : ` ${styles.photoShineLegacy}`
+                photoCutout
+                  ? ""
+                  : photoSoftBackground
+                    ? ` ${styles.photoShineScenic}`
+                    : ` ${styles.photoShineLegacy}`
               }`}
             />
           ) : null}
