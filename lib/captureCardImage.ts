@@ -1,5 +1,9 @@
 import { createContext, destroyContext, domToCanvas } from "modern-screenshot";
 
+export function cardImageDownloadFilename(slug: string) {
+  return `${slug || "world-cup-card"}.png`;
+}
+
 export async function captureCardPng(
   stage: HTMLElement,
   scale = 3

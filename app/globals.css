@@ -768,6 +768,12 @@ body > *{ position:relative; z-index:1; }
   border-color:color-mix(in srgb, var(--champagne) 45%, var(--line));
   background:linear-gradient(180deg, rgba(216,194,144,.14), rgba(216,194,144,.04));
 }
+.shareActionFull{
+  grid-column:1 / -1;
+}
+.shareActionFullSolo{
+  grid-column:2;
+}
 .sharePlatforms{
   display:grid; grid-template-columns:1fr 1fr; gap:8px;
 }

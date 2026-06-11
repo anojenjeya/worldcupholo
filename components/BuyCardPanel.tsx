@@ -16,6 +16,7 @@ import {
   videoFileExtension,
 } from "@/lib/recordCardVideo";
 import { resetCardPointerState } from "@/lib/cardPointerState";
+import { cardImageDownloadFilename, captureCardPng } from "@/lib/captureCardImage";
 import { celebrateTeamConfetti } from "@/lib/teamConfetti";
 import CheckoutModal from "@/components/CheckoutModal";
 
@@ -67,10 +68,12 @@ export default function BuyCardPanel({
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const [imageBlob, setImageBlob] = useState<Blob | null>(null);
   const [copied, setCopied] = useState(false);
   const [btnHover, setBtnHover] = useState(false);
 
   const videoUrlRef = useRef<string | null>(null);
+  const imageUrlRef = useRef<string | null>(null);
   const renderGenRef = useRef(0);
   const renderPromiseRef = useRef<Promise<Blob> | null>(null);
 
@@ -109,9 +112,26 @@ export default function BuyCardPanel({
     setVideoBlob(null);
   }, []);
 
+  const storeImageBlob = useCallback((blob: Blob) => {
+    if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current);
+    imageUrlRef.current = URL.createObjectURL(blob);
+    setImageBlob(blob);
+  }, []);
+
+  const cleanupImage = useCallback(() => {
+    if (imageUrlRef.current) {
+      URL.revokeObjectURL(imageUrlRef.current);
+      imageUrlRef.current = null;
+    }
+    setImageBlob(null);
+  }, []);
+
   useEffect(() => {
-    return () => cleanupVideo();
-  }, [cleanupVideo]);
+    return () => {
+      cleanupVideo();
+      cleanupImage();
+    };
+  }, [cleanupVideo, cleanupImage]);
 
   const restoreStage = useCallback(() => {
     const stage = captureRef.current;
@@ -190,17 +210,28 @@ export default function BuyCardPanel({
     a.click();
   }, [slug, videoBlob]);
 
+  const downloadImage = useCallback(() => {
+    const url = imageUrlRef.current;
+    if (!imageBlob || !url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = cardImageDownloadFilename(slug);
+    a.click();
+  }, [slug, imageBlob]);
+
   const generateAndDownload = useCallback(async () => {
     if (rendering) return;
     setRendering(true);
     setReady(false);
     setError(null);
+    cleanupImage();
 
     try {
       const stage = captureRef.current;
       if (!stage) throw new Error("Could not find your card to render.");
       await waitForCardReady(stage);
-      await ensureVideo();
+      const [, image] = await Promise.all([ensureVideo(), captureCardPng(stage)]);
+      storeImageBlob(image);
       downloadVideo();
       setReady(true);
       if (kit) celebrateTeamConfetti([kit.c1, kit.c2, kit.accent]);
@@ -209,7 +240,15 @@ export default function BuyCardPanel({
     } finally {
       setRendering(false);
     }
-  }, [captureRef, downloadVideo, ensureVideo, kit, rendering]);
+  }, [
+    captureRef,
+    cleanupImage,
+    downloadVideo,
+    ensureVideo,
+    kit,
+    rendering,
+    storeImageBlob,
+  ]);
 
   const handleDownloadClick = () => {
     setOpen(true);
@@ -227,6 +266,7 @@ export default function BuyCardPanel({
     setError(null);
     setCopied(false);
     cleanupVideo();
+    cleanupImage();
   };
 
   const copyLink = async () => {
@@ -297,7 +337,9 @@ export default function BuyCardPanel({
         error={error}
         ready={ready}
         videoUrl={videoUrl}
-        onDownload={downloadVideo}
+        onDownloadVideo={downloadVideo}
+        onDownloadImage={downloadImage}
+        imageReady={!!imageBlob}
         onRetry={() => void generateAndDownload()}
         onCopyLink={() => void copyLink()}
         copied={copied}

@@ -10,7 +10,9 @@ type CheckoutModalProps = {
   error: string | null;
   ready: boolean;
   videoUrl: string | null;
-  onDownload: () => void;
+  onDownloadVideo: () => void;
+  onDownloadImage: () => void;
+  imageReady: boolean;
   onRetry: () => void;
   onCopyLink: () => void;
   copied: boolean;
@@ -27,7 +29,9 @@ export default function CheckoutModal({
   error,
   ready,
   videoUrl,
-  onDownload,
+  onDownloadVideo,
+  onDownloadImage,
+  imageReady,
   onRetry,
   onCopyLink,
   copied,
@@ -85,17 +89,26 @@ export default function CheckoutModal({
             <div className="checkoutSuccessPanel">
               <p className="checkoutSuccessTitle">Your holo card is ready</p>
               <p className="shareHint">
-                Post your card or grab the file again. On Instagram, upload the downloaded video
+                Download the video or a still image of your card. On Instagram, upload the video
                 in the app.
               </p>
 
               {error ? <p className="shareError">{error}</p> : null}
 
               <div className="shareActions">
-                <button type="button" className="shareAction primary" onClick={onDownload}>
+                <button type="button" className="shareAction primary" onClick={onDownloadVideo}>
                   Download video
                 </button>
-                <button type="button" className="shareAction" onClick={onCopyLink}>
+                {imageReady ? (
+                  <button type="button" className="shareAction" onClick={onDownloadImage}>
+                    Download image
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className={`shareAction shareActionFull${imageReady ? "" : " shareActionFullSolo"}`}
+                  onClick={onCopyLink}
+                >
                   {copied ? "Link copied" : "Copy link"}
                 </button>
               </div>
