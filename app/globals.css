@@ -79,155 +79,39 @@ body > *{ position:relative; z-index:1; }
    buyBtnWrap (not buyBar) animates so the fixed checkout overlay
    inside buyBar never gains a transformed containing block. */
 .cardPreview{ animation:riseIn .7s var(--ease-out) .08s both; }
-.controlsSheet{ animation:riseIn .7s var(--ease-out) .16s both; }
-.controlsSheetFooter .buyBtnWrap{ animation:riseIn .7s var(--ease-out) .24s both; }
-
-.cardPreviewScale{
-  width:336px;
-  max-width:100%;
-}
-
-.controlsSheet{
-  display:flex;
-  flex-direction:column;
-  width:320px;
-  max-width:100%;
-}
-.controlsSheetHandle{ display:none; }
-.controlsSheetBody{ flex:1; min-width:0; }
-.controlsSheetFooter{
-  margin-top:auto;
-  padding-top:14px;
-  width:100%;
-}
+.panel{ animation:riseIn .7s var(--ease-out) .16s both; }
+.buyBar .buyBtnWrap{ animation:riseIn .7s var(--ease-out) .24s both; }
 
 @media (max-width:720px){
-  body{
-    align-items:stretch;
-    justify-content:flex-start;
-    padding:0;
-    overflow-x:hidden;
-  }
+  body{ padding-bottom:32px; }
 
-  .shell{
-    gap:8px;
-    max-width:100%;
-    min-height:100dvh;
-    padding:10px 16px 0;
-  }
-
-  .masthead{ gap:4px; flex-shrink:0; }
-  .mastheadEyebrow{ font-size:9px; letter-spacing:.32em; }
-  .mastheadTitle{ font-size:clamp(22px, 6.5vw, 28px); }
+  .shell{ gap:26px; }
 
   .composer{
-    flex:1;
-    flex-direction:column;
-    align-items:stretch;
-    gap:0;
-    position:relative;
-    min-height:0;
-  }
-  .cardColumn{
-    display:flex;
-    flex:1;
     flex-direction:column;
     align-items:center;
-    justify-content:center;
-    min-height:0;
-    padding-bottom:calc(min(52dvh, 480px) + 8px);
+    gap:28px;
   }
-
+  .cardColumn{ display:contents; }
   .cardPreview{
-    --card-mobile-scale:min(1, calc((100vw - 32px) / 336), calc((100dvh - min(52dvh, 480px) - 96px) / 470));
-    position:relative;
-    z-index:1;
-    width:100%;
+    order:1;
+    width:336px;
     max-width:100%;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    padding:4px 0;
     overflow:visible;
-    background:none;
+    /* Room for idle float + 3D tilt so the card isn't clipped at the top */
+    padding:22px 12px 10px;
+    box-sizing:content-box;
   }
-  .cardPreviewScale{
-    transform:scale(var(--card-mobile-scale));
-    transform-origin:center center;
-    margin-bottom:calc(470px * var(--card-mobile-scale) - 470px);
-  }
-
-  .controlsSheet{
-    position:fixed;
-    left:0;
-    right:0;
-    bottom:0;
-    z-index:50;
-    width:100%;
-    max-width:none;
-    max-height:min(52dvh, 480px);
-    border-top:1px solid rgba(255,255,255,.1);
-    border-radius:18px 18px 0 0;
-    background:linear-gradient(180deg, #0c0d11 0%, #090a0d 100%);
-    box-shadow:0 -18px 52px rgba(0,0,0,.78);
-    padding-bottom:env(safe-area-inset-bottom, 0px);
-  }
-  .controlsSheetHandle{
-    display:block;
-    flex-shrink:0;
-    padding:10px 16px 6px;
-    text-align:center;
-    cursor:default;
-  }
-  .controlsSheetHandle::before{
-    content:"";
-    display:block;
-    width:40px;
-    height:4px;
-    margin:0 auto 8px;
-    border-radius:999px;
-    background:rgba(255,255,255,.22);
-  }
-  .controlsSheetTitle{
-    font-family:var(--mono);
-    font-size:10px;
-    font-weight:500;
-    letter-spacing:.28em;
-    text-transform:uppercase;
-    color:var(--muted);
-  }
-  .controlsSheetBody{
-    flex:1;
-    min-height:0;
-    overflow-y:auto;
-    overscroll-behavior:contain;
-    -webkit-overflow-scrolling:touch;
-    padding:0 16px 4px;
-  }
-  .controlsSheetFooter{
-    flex-shrink:0;
-    margin-top:0;
-    padding:10px 16px 12px;
-    border-top:1px solid var(--line);
-    background:rgba(9,10,13,.96);
-  }
-
   .panel{
+    order:2;
     width:100%;
-    max-width:100%;
-    padding-bottom:8px;
-    animation:none;
+    max-width:336px;
   }
-  .panel label:first-of-type{ margin-top:4px; }
-  .panel label{ margin:12px 0 6px; }
-
-  .controlsSheet .countryDropdownPanel{
-    top:auto;
-    bottom:calc(100% + 6px);
-    transform-origin:bottom center;
-  }
-  .controlsSheet .countryDropdownList{
-    max-height:min(36dvh, 240px);
+  .buyBar{
+    order:3;
+    width:100%;
+    max-width:336px;
+    margin-top:4px;
   }
 }
 
@@ -574,8 +458,8 @@ body > *{ position:relative; z-index:1; }
 
   .masthead,
   .cardPreview,
-  .controlsSheet,
-  .controlsSheetFooter .buyBtnWrap,
+  .panel,
+  .buyBar .buyBtnWrap,
   .panel .countryDropdownPanel{ animation:none; }
 
   .panel .photoBtn:hover:not(:disabled),

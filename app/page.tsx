@@ -201,30 +201,34 @@ export default function Home() {
         <div className="composer">
         <div className="cardColumn">
           <div className="cardPreview">
-            <div className="cardPreviewScale">
-              <HoloCard
-                stageRef={stageRef}
-                name={name}
-                team={team}
-                cardStyle={cardStyle}
-                shine={shine}
-                finish={finish}
-                photoUrl={photoUrl}
-                photoCutout={photoCutout}
-                photoSoftBackground={photoSoftBackground}
-                processing={processing}
-                processingMessage={CARD_BUILD_MESSAGES[buildMsgIdx]}
-                processingProgress={photoProgress}
-              />
-            </div>
+            <HoloCard
+              stageRef={stageRef}
+              name={name}
+              team={team}
+              cardStyle={cardStyle}
+              shine={shine}
+              finish={finish}
+              photoUrl={photoUrl}
+              photoCutout={photoCutout}
+              photoSoftBackground={photoSoftBackground}
+              processing={processing}
+              processingMessage={CARD_BUILD_MESSAGES[buildMsgIdx]}
+              processingProgress={photoProgress}
+            />
+          </div>
+          <div className="buyBar">
+            <BuyCardPanel
+              captureRef={stageRef}
+              disabled={processing}
+              name={name}
+              team={team}
+              cardStyle={cardStyle}
+              shine={shine}
+              finish={finish}
+            />
           </div>
         </div>
 
-        <aside className="controlsSheet" aria-label="Card customization">
-          <div className="controlsSheetHandle">
-            <span className="controlsSheetTitle">Customize card</span>
-          </div>
-          <div className="controlsSheetBody">
         <div className="panel">
           <input
             ref={fileInputRef}
@@ -357,19 +361,6 @@ export default function Home() {
             ))}
           </div>
         </div>
-          </div>
-          <div className="controlsSheetFooter buyBar">
-            <BuyCardPanel
-              captureRef={stageRef}
-              disabled={processing}
-              name={name}
-              team={team}
-              cardStyle={cardStyle}
-              shine={shine}
-              finish={finish}
-            />
-          </div>
-        </aside>
         </div>
       </div>
     </>
