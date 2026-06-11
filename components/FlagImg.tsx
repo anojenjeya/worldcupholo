@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flagUrlForCode } from "@/lib/team-flags";
 
-/** flagcdn.com only serves a fixed set of widths (e.g. 160, 320) — not arbitrary sizes. */
 function flagSources(code: string): string[] {
   return [
+    flagUrlForCode(code),
     `https://flagcdn.com/w160/${code}.png`,
     `https://flagcdn.com/w320/${code}.png`,
     `https://flagcdn.com/${code}.svg`,
@@ -37,7 +38,11 @@ export default function FlagImg({
 
   const src = sources[sourceIndex];
   const srcSet =
-    sourceIndex === 0 ? `${sources[1]} 2x` : undefined;
+    sourceIndex === 0
+      ? `${flagUrlForCode(code)} 1x, https://flagcdn.com/w320/${code}.png 2x`
+      : sourceIndex === 1
+        ? `${sources[2]} 2x`
+        : undefined;
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
