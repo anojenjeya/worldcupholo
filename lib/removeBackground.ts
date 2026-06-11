@@ -17,18 +17,14 @@ async function toBlob(src: Blob | string): Promise<Blob> {
   return res.blob();
 }
 
-/** Smaller quantised model — faster first-visit download and inference. */
-function pickModel(): "isnet_quint8" {
-  return "isnet_quint8";
+function pickModel(): "isnet_fp16" | "isnet_quint8" {
+  return hasWebGpu() ? "isnet_fp16" : "isnet_quint8";
 }
 
-/** Segmentation resolution — lower = faster; card display is ~336px wide. */
-const SEGMENT_MAX_SIDE = 448;
+/** Segmentation resolution — 640px matches model rescale sweet spot. */
+const SEGMENT_MAX_SIDE = 640;
 
-/** Dim background pixels when the scene is mostly environment. */
 const BACKGROUND_OPACITY = 0.62;
-
-/** Foreground pixel share at or below this → keep background (50%+ is background). */
 const BACKGROUND_DOMINANT_THRESHOLD = 0.5;
 
 function buildConfig(onProgress?: (pct: number) => void): Config {
@@ -38,7 +34,7 @@ function buildConfig(onProgress?: (pct: number) => void): Config {
     device: hasWebGpu() ? "gpu" : "cpu",
     proxyToWorker: true,
     rescale: true,
-    output: { format: "image/png", quality: 0.85 },
+    output: { format: "image/png", quality: 0.92 },
     progress: (key, current, total) => {
       if (total <= 0) return;
       const ratio = current / total;
@@ -49,6 +45,200 @@ function buildConfig(onProgress?: (pct: number) => void): Config {
       }
     },
   };
+}
+
+async function loadMaskPixels(maskBlob: Blob) {
+  const bitmap = await createImageBitmap(maskBlob);
+  const w = bitmap.width;
+  const h = bitmap.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    throw new Error("Could not read mask.");
+  }
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return { data: ctx.getImageData(0, 0, w, h), w, h, canvas, ctx };
+}
+
+async function maskPixelsToBlob(
+  data: ImageData,
+  w: number,
+  h: number,
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D
+): Promise<Blob> {
+  ctx.putImageData(data, 0, 0);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Failed to encode mask."))),
+      "image/png"
+    );
+  });
+}
+
+/**
+ * Keep only the foreground island connected to the subject (lower-center seed).
+ * Removes stray mask speckles above the head / in the background.
+ */
+function keepSubjectMaskComponent(
+  data: ImageData,
+  w: number,
+  h: number,
+  threshold = 52
+): void {
+  const px = data.data;
+  const visited = new Uint8Array(w * h);
+  const keep = new Uint8Array(w * h);
+
+  let seedX = Math.floor(w * 0.5);
+  let seedY = Math.floor(h * 0.72);
+  let seedIdx = seedY * w + seedX;
+
+  if (px[seedIdx * 4 + 3] < threshold) {
+    let found = false;
+    for (let r = 1; r <= Math.max(w, h) && !found; r++) {
+      for (let dy = -r; dy <= r && !found; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const x = seedX + dx;
+          const y = seedY + dy;
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const i = y * w + x;
+          if (px[i * 4 + 3] >= threshold) {
+            seedX = x;
+            seedY = y;
+            seedIdx = i;
+            found = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!found) return;
+  }
+
+  const queue = [seedIdx];
+  visited[seedIdx] = 1;
+  keep[seedIdx] = 1;
+
+  while (queue.length > 0) {
+    const i = queue.pop()!;
+    const x = i % w;
+    const y = (i - x) / w;
+    const neighbors = [
+      x > 0 ? i - 1 : -1,
+      x < w - 1 ? i + 1 : -1,
+      y > 0 ? i - w : -1,
+      y < h - 1 ? i + w : -1,
+    ];
+    for (const ni of neighbors) {
+      if (ni < 0 || visited[ni]) continue;
+      visited[ni] = 1;
+      if (px[ni * 4 + 3] < threshold) continue;
+      keep[ni] = 1;
+      queue.push(ni);
+    }
+  }
+
+  for (let i = 0; i < w * h; i++) {
+    if (!keep[i]) px[i * 4 + 3] = 0;
+  }
+}
+
+/** Soften mask edges and harden core/background for a cleaner cutout. */
+function polishMaskAlpha(data: ImageData, w: number, h: number): void {
+  const px = data.data;
+  const alpha = new Uint8ClampedArray(w * h);
+  for (let i = 0; i < w * h; i++) alpha[i] = px[i * 4 + 3];
+
+  const blurred = new Uint8ClampedArray(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          sum += alpha[ny * w + nx];
+          n++;
+        }
+      }
+      blurred[y * w + x] = Math.round(sum / n);
+    }
+  }
+
+  for (let i = 0; i < w * h; i++) {
+    let a = blurred[i];
+    if (a < 24) a = 0;
+    else if (a > 232) a = 255;
+    px[i * 4 + 3] = a;
+  }
+}
+
+async function refineCutoutMask(maskBlob: Blob): Promise<Blob> {
+  const { data, w, h, canvas, ctx } = await loadMaskPixels(maskBlob);
+  keepSubjectMaskComponent(data, w, h);
+  polishMaskAlpha(data, w, h);
+  return maskPixelsToBlob(data, w, h, canvas, ctx);
+}
+
+/** Reduce colored halos on semi-transparent edge pixels (common on red/busy backgrounds). */
+async function defringeCutout(blob: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob);
+  const w = bitmap.width;
+  const h = bitmap.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return blob;
+  }
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const px = imageData.data;
+
+  for (let i = 0; i < w * h; i++) {
+    const idx = i * 4;
+    const a = px[idx + 3];
+    if (a <= 14) {
+      px[idx + 3] = 0;
+      continue;
+    }
+    if (a >= 250) continue;
+
+    const r = px[idx];
+    const g = px[idx + 1];
+    const b = px[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const spill = Math.max(0, r - Math.max(g, b), g - Math.max(r, b));
+    const edge = 1 - a / 255;
+
+    if (spill > 18 && edge > 0.08) {
+      const mix = Math.min(0.72, edge * 0.9);
+      px[idx] = Math.round(r * (1 - mix) + lum * mix);
+      px[idx + 1] = Math.round(g * (1 - mix) + lum * mix);
+      px[idx + 2] = Math.round(b * (1 - mix) + lum * mix);
+    }
+
+    if (a < 28) px[idx + 3] = 0;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Failed to defringe cutout."))),
+      "image/png"
+    );
+  });
 }
 
 async function trimTransparentCutout(blob: Blob, pad = 10): Promise<Blob> {
@@ -71,11 +261,10 @@ async function trimTransparentCutout(blob: Blob, pad = 10): Promise<Blob> {
   let minY = h;
   let maxX = 0;
   let maxY = 0;
-  const stride = 2;
 
-  for (let y = 0; y < h; y += stride) {
-    for (let x = 0; x < w; x += stride) {
-      if (data[(y * w + x) * 4 + 3] <= 12) continue;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] <= 16) continue;
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x);
@@ -128,22 +317,20 @@ async function resizeToMaxSide(blob: Blob, maxSide: number): Promise<Blob> {
     throw new Error("Could not resize image.");
   }
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "medium";
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close();
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (out) => (out ? resolve(out) : reject(new Error("Failed to resize image."))),
-      "image/jpeg",
-      0.9
+      "image/png"
     );
   });
 }
 
 let preloadPromise: Promise<void> | null = null;
 
-/** Download ONNX weights while the user is on the page (not just the JS bundle). */
 export function preloadBackgroundRemoval() {
   if (!preloadPromise) {
     preloadPromise = importBgRemoval()
@@ -157,9 +344,7 @@ export function preloadBackgroundRemoval() {
 
 export type PhotoProcessResult = {
   blob: Blob;
-  /** False for scenic / background-heavy shots — show the full photo on the card. */
   cutout: boolean;
-  /** Background pixels were dimmed instead of removed. */
   softBackground?: boolean;
 };
 
@@ -168,41 +353,26 @@ export type RemoveBgCallbacks = {
   onPreview?: (result: PhotoProcessResult) => void;
 };
 
-/** Share of mask pixels classified as foreground (sampled for speed). */
 async function measureForegroundRatio(
   maskBlob: Blob,
   threshold = 40,
   stride = 4
 ): Promise<number> {
-  const bitmap = await createImageBitmap(maskBlob);
-  const w = bitmap.width;
-  const h = bitmap.height;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    bitmap.close();
-    return 1;
-  }
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
-
-  const { data } = ctx.getImageData(0, 0, w, h);
+  const { data, w, h } = await loadMaskPixels(maskBlob);
+  const px = data.data;
   let foreground = 0;
   let samples = 0;
 
   for (let y = 0; y < h; y += stride) {
     for (let x = 0; x < w; x += stride) {
       samples++;
-      if (data[(y * w + x) * 4 + 3] >= threshold) foreground++;
+      if (px[(y * w + x) * 4 + 3] >= threshold) foreground++;
     }
   }
 
   return samples > 0 ? foreground / samples : 1;
 }
 
-/** Keep the scene but dim background pixels so the subject still reads on the card. */
 async function compositeSoftBackground(
   image: Blob,
   mask: Blob,
@@ -259,7 +429,7 @@ async function compositeSoftBackground(
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("Failed to composite scenic photo."))),
       "image/jpeg",
-      0.9
+      0.92
     );
   });
 }
@@ -294,7 +464,7 @@ export async function removePhotoBackground(
   const config = buildConfig(onProgress);
 
   const mask = await segmentForeground(work, config);
-  report(72);
+  report(70);
 
   const foregroundRatio = await measureForegroundRatio(mask);
   if (foregroundRatio <= BACKGROUND_DOMINANT_THRESHOLD) {
@@ -305,9 +475,13 @@ export async function removePhotoBackground(
     return kept;
   }
 
-  const raw = await applySegmentationMask(work, mask, config);
-  report(88);
-  const cutoutBlob = await trimTransparentCutout(raw);
+  const refinedMask = await refineCutoutMask(mask);
+  report(78);
+  const raw = await applySegmentationMask(work, refinedMask, config);
+  report(86);
+  const defringed = await defringeCutout(raw);
+  report(92);
+  const cutoutBlob = await trimTransparentCutout(defringed);
   const result: PhotoProcessResult = { blob: cutoutBlob, cutout: true };
 
   onPreview?.(result);
