@@ -6,7 +6,7 @@ import {
   Instrument_Serif,
   Saira_Condensed,
 } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 // Self-hosted via next/font so the video capturer can embed them —
