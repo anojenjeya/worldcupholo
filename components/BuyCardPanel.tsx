@@ -16,6 +16,7 @@ import {
   videoFileExtension,
 } from "@/lib/recordCardVideo";
 import { resetCardPointerState } from "@/lib/cardPointerState";
+import { celebrateTeamConfetti } from "@/lib/teamConfetti";
 import CheckoutModal from "@/components/CheckoutModal";
 
 type BuyCardPanelProps = CardShareState & {
@@ -202,12 +203,13 @@ export default function BuyCardPanel({
       await ensureVideo();
       downloadVideo();
       setReady(true);
+      if (kit) celebrateTeamConfetti([kit.c1, kit.c2, kit.accent]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create your video.");
     } finally {
       setRendering(false);
     }
-  }, [captureRef, downloadVideo, ensureVideo, rendering]);
+  }, [captureRef, downloadVideo, ensureVideo, kit, rendering]);
 
   const handleDownloadClick = () => {
     setOpen(true);
