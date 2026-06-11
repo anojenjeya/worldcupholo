@@ -41,6 +41,8 @@ export type HoloCardProps = {
   photoUrl?: string | null;
   /** True when photoUrl is a transparent PNG cutout. */
   photoCutout?: boolean;
+  /** Scenic shot — full photo with dimmed background baked in. */
+  photoSoftBackground?: boolean;
   /** Background removal in progress. */
   processing?: boolean;
   processingMessage?: string;
@@ -127,6 +129,7 @@ export default function HoloCard({
   finish = "gloss",
   photoUrl,
   photoCutout = false,
+  photoSoftBackground = false,
   processing = false,
   processingMessage = "Removing background…",
   processingProgress = 0,
@@ -276,7 +279,11 @@ export default function HoloCard({
           {photoUrl ? (
             <div
               className={`${styles.layer} ${styles.photo}${
-                photoCutout ? ` ${styles.photoCutout}` : ` ${styles.photoLegacy}`
+                photoCutout
+                  ? ` ${styles.photoCutout}`
+                  : photoSoftBackground
+                    ? ` ${styles.photoScenic}`
+                    : ` ${styles.photoLegacy}`
               }`}
               style={
                 photoCutout && photoFit

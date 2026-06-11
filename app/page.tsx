@@ -27,6 +27,7 @@ export default function Home() {
   const [finish, setFinish] = useState<Finish>("gloss");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoCutout, setPhotoCutout] = useState(false);
+  const [photoSoftBackground, setPhotoSoftBackground] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [photoProgress, setPhotoProgress] = useState(0);
   const [buildMsgIdx, setBuildMsgIdx] = useState(0);
@@ -47,15 +48,16 @@ export default function Home() {
     };
   }, []);
 
-  const applyPhoto = (blob: Blob, cutout: boolean) => {
+  const applyPhoto = (blob: Blob, cutout: boolean, softBackground = false) => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(blob);
     objectUrlRef.current = url;
     setPhotoUrl(url);
     setPhotoCutout(cutout);
+    setPhotoSoftBackground(softBackground);
   };
 
-  const showRawPhoto = (blob: Blob) => applyPhoto(blob, false);
+  const showRawPhoto = (blob: Blob) => applyPhoto(blob, false, false);
 
   const processPhoto = async (src: Blob | string) => {
     const gen = ++processGenRef.current;
@@ -63,6 +65,7 @@ export default function Home() {
     setProcessing(true);
     setPhotoProgress(0);
     setPhotoCutout(false);
+    setPhotoSoftBackground(false);
 
     try {
       const input =
@@ -83,24 +86,26 @@ export default function Home() {
         onProgress: setPhotoProgress,
         onPreview: (preview) => {
           if (gen !== processGenRef.current) return;
-          applyPhoto(preview.blob, preview.cutout);
+          applyPhoto(preview.blob, preview.cutout, preview.softBackground ?? false);
           setProcessing(false);
         },
       });
       if (gen !== processGenRef.current) return;
-      applyPhoto(result.blob, result.cutout);
+      applyPhoto(result.blob, result.cutout, result.softBackground ?? false);
     } catch (err) {
       console.error("Background removal failed:", err);
       if (gen !== processGenRef.current) return;
       if (typeof src === "string") {
         setPhotoUrl(src);
         setPhotoCutout(false);
+        setPhotoSoftBackground(false);
       } else {
         if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
         const url = URL.createObjectURL(src);
         objectUrlRef.current = url;
         setPhotoUrl(url);
         setPhotoCutout(false);
+        setPhotoSoftBackground(false);
       }
     } finally {
       if (gen === processGenRef.current) {
@@ -205,6 +210,7 @@ export default function Home() {
               finish={finish}
               photoUrl={photoUrl}
               photoCutout={photoCutout}
+              photoSoftBackground={photoSoftBackground}
               processing={processing}
               processingMessage={CARD_BUILD_MESSAGES[buildMsgIdx]}
               processingProgress={photoProgress}

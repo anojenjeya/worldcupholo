@@ -17,12 +17,19 @@ async function toBlob(src: Blob | string): Promise<Blob> {
   return res.blob();
 }
 
-function pickModel(): "isnet_fp16" | "isnet_quint8" {
-  return hasWebGpu() ? "isnet_fp16" : "isnet_quint8";
+/** Smaller quantised model — faster first-visit download and inference. */
+function pickModel(): "isnet_quint8" {
+  return "isnet_quint8";
 }
 
-/** Max working edge — card display needs ~640px; smaller = faster decode/encode. */
-const WORK_MAX_SIDE = 640;
+/** Segmentation resolution — lower = faster; card display is ~336px wide. */
+const SEGMENT_MAX_SIDE = 448;
+
+/** Dim background pixels when the scene is mostly environment. */
+const BACKGROUND_OPACITY = 0.62;
+
+/** Foreground pixel share at or below this → keep background (50%+ is background). */
+const BACKGROUND_DOMINANT_THRESHOLD = 0.5;
 
 function buildConfig(onProgress?: (pct: number) => void): Config {
   const report = (pct: number) => onProgress?.(Math.min(100, Math.round(pct)));
@@ -36,9 +43,9 @@ function buildConfig(onProgress?: (pct: number) => void): Config {
       if (total <= 0) return;
       const ratio = current / total;
       if (key.startsWith("fetch:")) {
-        report(4 + ratio * 28);
+        report(4 + ratio * 24);
       } else if (key.startsWith("compute:")) {
-        report(34 + ratio * 64);
+        report(30 + ratio * 48);
       }
     },
   };
@@ -64,9 +71,10 @@ async function trimTransparentCutout(blob: Blob, pad = 10): Promise<Blob> {
   let minY = h;
   let maxX = 0;
   let maxY = 0;
+  const stride = 2;
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
+  for (let y = 0; y < h; y += stride) {
+    for (let x = 0; x < w; x += stride) {
       if (data[(y * w + x) * 4 + 3] <= 12) continue;
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
@@ -151,6 +159,8 @@ export type PhotoProcessResult = {
   blob: Blob;
   /** False for scenic / background-heavy shots — show the full photo on the card. */
   cutout: boolean;
+  /** Background pixels were dimmed instead of removed. */
+  softBackground?: boolean;
 };
 
 export type RemoveBgCallbacks = {
@@ -158,23 +168,12 @@ export type RemoveBgCallbacks = {
   onPreview?: (result: PhotoProcessResult) => void;
 };
 
-type AlphaBounds = {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-  subjectW: number;
-  subjectH: number;
-};
-
-async function getImageSize(blob: Blob) {
-  const bitmap = await createImageBitmap(blob);
-  const size = { w: bitmap.width, h: bitmap.height };
-  bitmap.close();
-  return size;
-}
-
-async function measureMaskBounds(maskBlob: Blob, threshold = 40): Promise<AlphaBounds | null> {
+/** Share of mask pixels classified as foreground (sampled for speed). */
+async function measureForegroundRatio(
+  maskBlob: Blob,
+  threshold = 40,
+  stride = 4
+): Promise<number> {
   const bitmap = await createImageBitmap(maskBlob);
   const w = bitmap.width;
   const h = bitmap.height;
@@ -184,52 +183,85 @@ async function measureMaskBounds(maskBlob: Blob, threshold = 40): Promise<AlphaB
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     bitmap.close();
-    return null;
+    return 1;
   }
   ctx.drawImage(bitmap, 0, 0);
   bitmap.close();
 
   const { data } = ctx.getImageData(0, 0, w, h);
-  let minX = w;
-  let minY = h;
-  let maxX = 0;
-  let maxY = 0;
+  let foreground = 0;
+  let samples = 0;
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const a = data[(y * w + x) * 4 + 3];
-      if (a < threshold) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
+  for (let y = 0; y < h; y += stride) {
+    for (let x = 0; x < w; x += stride) {
+      samples++;
+      if (data[(y * w + x) * 4 + 3] >= threshold) foreground++;
     }
   }
 
-  if (maxX < minX || maxY < minY) return null;
-
-  return {
-    minX,
-    minY,
-    maxX,
-    maxY,
-    subjectW: maxX - minX + 1,
-    subjectH: maxY - minY + 1,
-  };
+  return samples > 0 ? foreground / samples : 1;
 }
 
-/** Skip cutout when the scene/background is a major part of the photo. */
-function isBackgroundDominantScene(bounds: AlphaBounds, imgW: number, imgH: number): boolean {
-  const coverage = (bounds.subjectW * bounds.subjectH) / (imgW * imgH);
-  const heightRatio = bounds.subjectH / imgH;
-  const imgAspect = imgW / imgH;
+/** Keep the scene but dim background pixels so the subject still reads on the card. */
+async function compositeSoftBackground(
+  image: Blob,
+  mask: Blob,
+  bgOpacity = BACKGROUND_OPACITY,
+  fgThreshold = 48
+): Promise<Blob> {
+  const [imgBitmap, maskBitmap] = await Promise.all([
+    createImageBitmap(image),
+    createImageBitmap(mask),
+  ]);
+  const w = imgBitmap.width;
+  const h = imgBitmap.height;
 
-  if (coverage < 0.36) return true;
-  if (heightRatio < 0.5 && coverage < 0.54) return true;
-  if (imgAspect > 1.08 && coverage < 0.46) return true;
-  if (heightRatio < 0.64 && bounds.minY > imgH * 0.07) return true;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    imgBitmap.close();
+    maskBitmap.close();
+    return image;
+  }
 
-  return false;
+  ctx.drawImage(imgBitmap, 0, 0);
+  imgBitmap.close();
+
+  const maskCanvas = document.createElement("canvas");
+  maskCanvas.width = w;
+  maskCanvas.height = h;
+  const maskCtx = maskCanvas.getContext("2d");
+  if (!maskCtx) {
+    maskBitmap.close();
+    return image;
+  }
+  maskCtx.drawImage(maskBitmap, 0, 0, w, h);
+  maskBitmap.close();
+
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const maskData = maskCtx.getImageData(0, 0, w, h);
+  const pixels = imgData.data;
+  const maskPixels = maskData.data;
+
+  for (let i = 0; i < w * h; i++) {
+    const idx = i * 4;
+    if (maskPixels[idx + 3] >= fgThreshold) continue;
+    pixels[idx] = Math.round(pixels[idx] * bgOpacity);
+    pixels[idx + 1] = Math.round(pixels[idx + 1] * bgOpacity);
+    pixels[idx + 2] = Math.round(pixels[idx + 2] * bgOpacity);
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Failed to composite scenic photo."))),
+      "image/jpeg",
+      0.9
+    );
+  });
 }
 
 function normalizeCallbacks(
@@ -246,31 +278,35 @@ export async function removePhotoBackground(
   const { onProgress, onPreview } = normalizeCallbacks(callbacks);
   const report = (pct: number) => onProgress?.(Math.min(100, Math.round(pct)));
 
-  await preloadBackgroundRemoval().catch(() => undefined);
-
-  const { segmentForeground, applySegmentationMask } = await importBgRemoval();
-  const config = buildConfig(onProgress);
+  const importTask = importBgRemoval();
+  const preloadTask = preloadBackgroundRemoval().catch(() => undefined);
 
   report(2);
   const original = await toBlob(src);
-  report(8);
-  const work = await resizeToMaxSide(original, WORK_MAX_SIDE);
-  report(12);
+  report(6);
+  const work = await resizeToMaxSide(original, SEGMENT_MAX_SIDE);
+  report(10);
+
+  const [{ segmentForeground, applySegmentationMask }] = await Promise.all([
+    importTask,
+    preloadTask,
+  ]);
+  const config = buildConfig(onProgress);
 
   const mask = await segmentForeground(work, config);
-  report(78);
+  report(72);
 
-  const { w, h } = await getImageSize(work);
-  const bounds = await measureMaskBounds(mask);
-  if (bounds && isBackgroundDominantScene(bounds, w, h)) {
-    const kept: PhotoProcessResult = { blob: work, cutout: false };
+  const foregroundRatio = await measureForegroundRatio(mask);
+  if (foregroundRatio <= BACKGROUND_DOMINANT_THRESHOLD) {
+    const blob = await compositeSoftBackground(work, mask);
+    const kept: PhotoProcessResult = { blob, cutout: false, softBackground: true };
     onPreview?.(kept);
     report(100);
     return kept;
   }
 
   const raw = await applySegmentationMask(work, mask, config);
-  report(92);
+  report(88);
   const cutoutBlob = await trimTransparentCutout(raw);
   const result: PhotoProcessResult = { blob: cutoutBlob, cutout: true };
 

@@ -257,6 +257,17 @@
     linear-gradient(180deg, #000 0%, #000 82%, transparent 98%);
   -webkit-mask-composite:source-in; mask-composite:intersect;
 }
+
+/* Scenic / environment shots — background already dimmed in the composite. */
+.photoScenic{
+  display:block;
+  background-size:cover; background-position:center 22%;
+  background-repeat:no-repeat;
+  filter:contrast(1.04) brightness(1) saturate(1.02)
+         drop-shadow(0 10px 28px rgba(0,0,0,.42));
+  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 88%, transparent 100%);
+          mask-image:linear-gradient(180deg, #000 0%, #000 88%, transparent 100%);
+}
 .photo.empty{
   display:block;
   background:transparent;
