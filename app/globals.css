@@ -97,7 +97,10 @@ body > *{ position:relative; z-index:1; }
     order:1;
     width:336px;
     max-width:100%;
-    contain:paint;
+    overflow:visible;
+    /* Room for idle float + 3D tilt so the card isn't clipped at the top */
+    padding:22px 12px 10px;
+    box-sizing:content-box;
   }
   .panel{
     order:2;

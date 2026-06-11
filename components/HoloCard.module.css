@@ -386,6 +386,9 @@
 }
 
 @media (max-width:720px){
+  .stage{
+    overflow:visible;
+  }
   .top,
   .bottom{
     transform:none;
@@ -394,6 +397,20 @@
     -webkit-clip-path:inset(0 round var(--card-radius));
             clip-path:inset(0 round var(--card-radius));
   }
+  /* Slightly softer float — less vertical travel on small screens */
+  .card:not([data-active]){
+    animation:cardFloatMobile 9s ease-in-out infinite, hueShimmer 7.5s ease-in-out infinite, glowPulse 5.5s ease-in-out infinite;
+  }
+  .matte:not([data-active]){
+    animation:cardFloatMobile 9s ease-in-out infinite, glowPulseMatte 8s ease-in-out infinite;
+  }
+}
+
+@keyframes cardFloatMobile{
+  0%,100%{ transform:rotateX(1.5deg) rotateY(-3deg) translateY(0) scale(1); }
+  25%    { transform:rotateX(-1deg) rotateY(2deg) translateY(-3px) scale(1.004); }
+  50%    { transform:rotateX(1.2deg) rotateY(3deg) translateY(-1px) scale(1.002); }
+  75%    { transform:rotateX(-1.5deg) rotateY(-1.5deg) translateY(-2px) scale(1.004); }
 }
 
 @media (prefers-reduced-motion: reduce){
