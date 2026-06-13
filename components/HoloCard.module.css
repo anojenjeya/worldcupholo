@@ -287,38 +287,39 @@
 }
 
 /* Scenic: card foil reads in the vignette; photo stays clean in the center. */
-.artSceneScenic .photoBackdrop{ opacity:.78; }
-.artSceneScenic .facets{ opacity:.38; }
+.artSceneScenic .photoBackdrop{ opacity:.82; }
+.artSceneScenic .fullArtSpecks{ opacity:.62; }
+.artSceneScenic .facets{ opacity:.44; }
 .artSceneScenic .holo{
-  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 0.68);
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 0.76);
 }
 .artSceneScenic .holo2{
-  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 0.58);
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 0.66);
 }
 .artSceneScenic .fullArtFade{
   z-index:5;
-  opacity:.84;
+  opacity:.8;
 }
 .artSceneScenic .photoShine{
   z-index:6;
 }
 .card.galaxy .artSceneScenic .holo{
-  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * 0.82);
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * 0.9);
 }
 .card.galaxy .artSceneScenic .holo2{
-  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * 0.72);
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * 0.8);
 }
 .card[data-active] .artSceneScenic .holo{
-  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 0.78);
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 0.86);
 }
 .card[data-active] .artSceneScenic .holo2{
-  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 0.68);
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 0.76);
 }
 .card[data-active].galaxy .artSceneScenic .holo{
-  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * 0.92);
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * 1);
 }
 .card[data-active].galaxy .artSceneScenic .holo2{
-  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * 0.82);
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * 0.9);
 }
 .photo.empty{
   display:block;
@@ -365,10 +366,10 @@
 }
 .photoShineScenic{
   mix-blend-mode:color-dodge;
-  opacity:calc((0.026 + var(--glow) * 0.034) * var(--shineOpMul, 1));
-  filter:brightness(calc(.9 + var(--glow) * .14))
-         contrast(1.18)
-         saturate(calc(1.06 * var(--shineSatMul, 1)))
+  opacity:calc((0.032 + var(--glow) * 0.04) * var(--shineOpMul, 1));
+  filter:brightness(calc(.94 + var(--glow) * .16))
+         contrast(1.22)
+         saturate(calc(1.08 * var(--shineSatMul, 1)))
          hue-rotate(calc(var(--hue) * var(--shineHueMul, 1) * .4deg));
   -webkit-mask-image:
     radial-gradient(ellipse 76% 92% at 50% 40%, #000 56%, transparent 84%),
@@ -379,13 +380,13 @@
   -webkit-mask-composite:source-in; mask-composite:intersect;
 }
 .card[data-active] .photoShineScenic{
-  opacity:calc((0.034 + var(--glow) * 0.042) * var(--shineOpMul, 1));
+  opacity:calc((0.04 + var(--glow) * 0.048) * var(--shineOpMul, 1));
 }
 .galaxy .photoShineScenic{
-  opacity:calc((0.022 + var(--glow) * 0.028) * var(--shineOpMul, 1));
+  opacity:calc((0.028 + var(--glow) * 0.034) * var(--shineOpMul, 1));
 }
 .card[data-active].galaxy .photoShineScenic{
-  opacity:calc((0.03 + var(--glow) * 0.036) * var(--shineOpMul, 1));
+  opacity:calc((0.036 + var(--glow) * 0.042) * var(--shineOpMul, 1));
 }
 .card[data-active] .photoShine{
   mix-blend-mode:color-dodge;
