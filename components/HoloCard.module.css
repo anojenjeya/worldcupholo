@@ -258,28 +258,67 @@
   -webkit-mask-composite:source-in; mask-composite:intersect;
 }
 
-/* Scenic / environment shots — background already dimmed in the composite. */
+/* Scenic — vignette into card art + team tint (not a full-bleed overlay). */
 .photoScenic{
   display:block;
   z-index:4;
-  opacity:.84;
-  background-size:cover; background-position:center 22%;
+  background-size:cover; background-position:center 24%;
   background-repeat:no-repeat;
-  filter:contrast(1.04) brightness(.98) saturate(1.04)
-         drop-shadow(0 10px 28px rgba(0,0,0,.42));
-  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 88%, transparent 100%);
-          mask-image:linear-gradient(180deg, #000 0%, #000 88%, transparent 100%);
+  filter:contrast(1.03) brightness(.91) saturate(.86);
+  -webkit-mask-image:
+    radial-gradient(ellipse 76% 92% at 50% 40%, #000 56%, transparent 84%),
+    linear-gradient(180deg, #000 0%, #000 84%, transparent 98%);
+          mask-image:
+    radial-gradient(ellipse 76% 92% at 50% 40%, #000 56%, transparent 84%),
+    linear-gradient(180deg, #000 0%, #000 84%, transparent 98%);
+  -webkit-mask-composite:source-in; mask-composite:intersect;
+}
+.photoScenic::after{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    linear-gradient(165deg,
+      color-mix(in srgb, var(--t1) 14%, transparent) 0%,
+      transparent 38%,
+      color-mix(in srgb, var(--t2) 10%, transparent) 72%),
+    linear-gradient(0deg, rgba(7,8,9,.62) 0%, transparent 42%);
+  mix-blend-mode:soft-light;
+  pointer-events:none;
 }
 
-/* Scenic: foil sits under a slightly translucent photo; light shine on top. */
-.artSceneScenic .photoBackdrop{ opacity:0; }
-.artSceneScenic .facets{ opacity:.5; }
+/* Scenic: card foil reads in the vignette; photo stays clean in the center. */
+.artSceneScenic .photoBackdrop{ opacity:.78; }
+.artSceneScenic .facets{ opacity:.38; }
+.artSceneScenic .holo{
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 0.68);
+}
+.artSceneScenic .holo2{
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 0.58);
+}
 .artSceneScenic .fullArtFade{
   z-index:5;
-  opacity:.68;
+  opacity:.84;
 }
 .artSceneScenic .photoShine{
   z-index:6;
+}
+.card.galaxy .artSceneScenic .holo{
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * 0.82);
+}
+.card.galaxy .artSceneScenic .holo2{
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * 0.72);
+}
+.card[data-active] .artSceneScenic .holo{
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * var(--styleHoloMul, 1) * 0.78);
+}
+.card[data-active] .artSceneScenic .holo2{
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * var(--styleHolo2Mul, 1) * 0.68);
+}
+.card[data-active].galaxy .artSceneScenic .holo{
+  opacity:calc((var(--finishHoloBase) + var(--glow) * var(--finishHoloRange)) * var(--shineOpMul, 1) * 0.92);
+}
+.card[data-active].galaxy .artSceneScenic .holo2{
+  opacity:calc((var(--finishHolo2Base) + var(--glow) * var(--finishHolo2Range)) * var(--shineHolo2OpMul, 1) * 0.82);
 }
 .photo.empty{
   display:block;
@@ -325,23 +364,28 @@
   -webkit-mask-composite:source-in; mask-composite:intersect;
 }
 .photoShineScenic{
-  mix-blend-mode:overlay;
-  opacity:calc((0.075 + var(--glow) * 0.055) * var(--shineOpMul, 1));
-  filter:brightness(calc(.92 + var(--glow) * .12))
-         contrast(1.2)
-         saturate(calc(1.08 * var(--shineSatMul, 1)));
-  -webkit-mask-image:linear-gradient(180deg, #000 0%, #000 90%, transparent 100%);
-          mask-image:linear-gradient(180deg, #000 0%, #000 90%, transparent 100%);
+  mix-blend-mode:color-dodge;
+  opacity:calc((0.026 + var(--glow) * 0.034) * var(--shineOpMul, 1));
+  filter:brightness(calc(.9 + var(--glow) * .14))
+         contrast(1.18)
+         saturate(calc(1.06 * var(--shineSatMul, 1)))
+         hue-rotate(calc(var(--hue) * var(--shineHueMul, 1) * .4deg));
+  -webkit-mask-image:
+    radial-gradient(ellipse 76% 92% at 50% 40%, #000 56%, transparent 84%),
+    linear-gradient(180deg, #000 0%, #000 84%, transparent 98%);
+          mask-image:
+    radial-gradient(ellipse 76% 92% at 50% 40%, #000 56%, transparent 84%),
+    linear-gradient(180deg, #000 0%, #000 84%, transparent 98%);
+  -webkit-mask-composite:source-in; mask-composite:intersect;
 }
 .card[data-active] .photoShineScenic{
-  mix-blend-mode:color-dodge;
-  opacity:calc((0.095 + var(--glow) * 0.065) * var(--shineOpMul, 1));
+  opacity:calc((0.034 + var(--glow) * 0.042) * var(--shineOpMul, 1));
 }
 .galaxy .photoShineScenic{
-  opacity:calc((0.065 + var(--glow) * 0.048) * var(--shineOpMul, 1));
+  opacity:calc((0.022 + var(--glow) * 0.028) * var(--shineOpMul, 1));
 }
 .card[data-active].galaxy .photoShineScenic{
-  opacity:calc((0.085 + var(--glow) * 0.058) * var(--shineOpMul, 1));
+  opacity:calc((0.03 + var(--glow) * 0.036) * var(--shineOpMul, 1));
 }
 .card[data-active] .photoShine{
   mix-blend-mode:color-dodge;
